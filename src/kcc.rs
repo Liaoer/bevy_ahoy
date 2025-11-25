@@ -58,7 +58,7 @@ impl Default for CharacterController {
             filter: SpatialQueryFilter::default(),
             standing_view_height: 1.7,
             crouch_view_height: 1.2,
-            ground_distance: 0.02,
+            ground_distance: 0.05,
             min_walk_cos: 0.766,
             stop_speed: 2.4,
             friction_hz: 4.0,
@@ -188,6 +188,14 @@ fn run_kcc(
             dt: time.delta_secs(),
             dt_duration: time.delta(),
         };
+        let offset = move_and_slide.depenetrate(
+            state.collider(),
+            transform.translation,
+            transform.rotation,
+            &((&ctx.cfg.move_and_slide).into()),
+            &ctx.cfg.filter,
+        );
+        transform.translation += offset;
 
         categorize_position(&mut transform, &move_and_slide, &mut state, &ctx);
 
@@ -432,7 +440,7 @@ fn stay_on_ground(
     ctx: &Ctx,
 ) {
     let cast_dir = Vec3::Y;
-    let cast_len = 0.05;
+    let cast_len = ctx.cfg.ground_distance;
 
     let hit = move_and_slide.cast_move(
         state.collider(),
@@ -461,7 +469,7 @@ fn stay_on_ground(
     if hit.intersects() || hit.normal1.y < ctx.cfg.min_walk_cos {
         return;
     }
-    transform.translation += cast_dir * hit.distance;
+    transform.translation = start + cast_dir * hit.distance;
 }
 
 fn accelerate(
@@ -524,6 +532,7 @@ fn categorize_position(
         {
             state.grounded = Some(hit);
         } else {
+            info!("{hit:?}");
             state.grounded = None;
             // TODO: set surface friction to 0.25 for some reason
         }
@@ -618,15 +627,9 @@ fn calculate_wish_velocity(state: &CharacterControllerState, ctx: &Ctx) -> Vec3 
     let mut forward = Vec3::from(ctx.orientation.forward());
     forward.y = 0.0;
     forward = forward.normalize_or_zero();
-    if let Some(grounded) = state.grounded {
-        forward = MoveAndSlide::project_velocity(forward, &[grounded.normal1.try_into().unwrap()]);
-    }
     forward = forward.normalize_or_zero();
     let mut right = Vec3::from(ctx.orientation.right());
     right.y = 0.0;
-    if let Some(grounded) = state.grounded {
-        right = MoveAndSlide::project_velocity(right, &[grounded.normal1.try_into().unwrap()]);
-    }
     right = right.normalize_or_zero();
 
     let wish_vel = movement.y * forward + movement.x * right;
