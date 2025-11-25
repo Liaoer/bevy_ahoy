@@ -177,7 +177,7 @@ fn reset_player(
     spawner: Single<&Transform, (With<SpawnPlayer>, Without<Player>)>,
 ) {
     let (mut transform, mut state) = player.into_inner();
-    state.velocity.y = 0.0;
+    state.velocity = Vec3::ZERO;
     transform.translation = spawner.translation;
 }
 
