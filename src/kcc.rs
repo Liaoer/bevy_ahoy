@@ -70,7 +70,7 @@ impl Default for CharacterController {
             speed: 15.5,
             air_speed: 1.5,
             move_and_slide: MoveAndSlideConfig {
-                skin_width: 0.01,
+                skin_width: 0.0075,
                 ..default()
             },
             max_speed: 100.0,
@@ -358,17 +358,18 @@ fn step_move(
     state: &mut CharacterControllerState,
     ctx: &Ctx,
 ) {
-    let vec_pos = transform.translation;
-    let vec_vel = state.velocity;
+    let original_position = transform.translation;
+    let original_velocity = state.velocity;
 
     // Slide the direct path
     try_player_move(transform, move_and_slide, state, ctx);
 
-    let vec_down_pos = transform.translation;
-    let vec_down_vel = state.velocity;
+    let down_touching_entities = state.touching_entities.clone();
+    let down_position = transform.translation;
+    let down_velocity = state.velocity;
 
-    transform.translation = vec_pos;
-    state.velocity = vec_vel;
+    transform.translation = original_position;
+    state.velocity = original_velocity;
 
     // step up
     let cast_dir = Dir3::Y;
@@ -401,8 +402,8 @@ fn step_move(
 
     // If we either fall or slide, use the direct slide instead
     if !hit.is_some_and(|h| h.normal1.y >= ctx.cfg.min_walk_cos) {
-        transform.translation = vec_down_pos;
-        state.velocity = vec_down_vel;
+        transform.translation = down_position;
+        state.velocity = down_velocity;
         return;
     };
     let hit = hit.unwrap();
@@ -419,13 +420,14 @@ fn step_move(
     let vec_up_pos = transform.translation;
 
     // use the one that wend further
-    let down_dist = vec_down_pos.xz().distance_squared(vec_pos.xz());
-    let up_dist = vec_up_pos.xz().distance_squared(vec_pos.xz());
+    let down_dist = down_position.xz().distance_squared(original_position.xz());
+    let up_dist = vec_up_pos.xz().distance_squared(original_position.xz());
     if down_dist > up_dist {
-        transform.translation = vec_down_pos;
-        state.velocity = vec_down_vel;
+        transform.translation = down_position;
+        state.velocity = down_velocity;
+        state.touching_entities = down_touching_entities;
     } else {
-        state.velocity.y = vec_down_vel.y;
+        state.velocity.y = down_velocity.y;
     }
 }
 
@@ -440,6 +442,7 @@ fn try_player_move(
         config.planes.push(Dir3::new_unchecked(grounded.normal1));
     }
 
+    let mut touching_entities = std::mem::take(&mut state.touching_entities);
     let out = move_and_slide.move_and_slide(
         state.collider(),
         transform.translation,
@@ -448,10 +451,14 @@ fn try_player_move(
         ctx.dt_duration,
         &config,
         &ctx.cfg.filter,
-        |_| true,
+        |hit| {
+            touching_entities.insert(hit.entity);
+            true
+        },
     );
     transform.translation = out.position;
     state.velocity = out.projected_velocity;
+    std::mem::swap(&mut state.touching_entities, &mut touching_entities);
 }
 
 fn stay_on_ground(
