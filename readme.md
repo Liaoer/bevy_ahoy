@@ -22,12 +22,14 @@ This tradeoff allows Ahoy to fully define its own separate model of how a charac
 - [x] ramp walking: walk up ramps under a certain angle of steepness. Fall down if the ramp is too steep.
 - [x] ground snapping: walk down ramps and stairs instead of flying off of them
 - [x] Quake/Source movement tech: air strafe, surf, bunny hopping, etc.
+- [ ] Builtin first person camera controller: Add `CameraOfCharacterController` to a camera to have out-of-the-box first person camera behavior
 - [ ] Events on state transitions: observe events for jump start, landing, stair stepping, etc. to add sound effects, particles, damage the character, etc.
-- [ ] Wall running
-- [ ] Mantling
-- [ ] Different movement in water
-- [ ] Surface friction
-- [ ] Ladders
+- [ ] Wall running: run along walls for a given distance and jump off of them
+- [ ] Double jumps: jump a second time in the air with a different feel from the first jump. Can be chained with wall running.
+- [ ] Mantling: Hold the jump button near ledge while either on the ground or in air to grab it and climb up on it
+- [ ] Different movement in water: Dive up and down in water, move slower, and jump differently out of it
+- [ ] Surface friction: Set the friction differently on individual surfaces to make them slippery or extra grippy
+- [ ] Ladders: Walk or jump to a ladder to hold onto it, then move to climb up and down on it or jump to get off early. Step up the surface when you reach the end of the ladder.
 
 ## Usage
 
