@@ -50,6 +50,8 @@ pub struct CharacterController {
     pub jump_height: f32,
     pub max_air_speed: f32,
     pub unground_speed: f32,
+    pub step_from_air: bool,
+    pub step_into_air: bool,
 }
 
 impl Default for CharacterController {
@@ -78,6 +80,8 @@ impl Default for CharacterController {
             jump_height: 1.5,
             max_air_speed: 0.76,
             unground_speed: 10.0,
+            step_from_air: false,
+            step_into_air: false,
         }
     }
 }
@@ -258,7 +262,11 @@ fn air_move(
 
     *velocity += state.base_velocity;
 
-    move_character(transform, velocity, move_and_slide, state, ctx);
+    if ctx.cfg.step_from_air {
+        step_move(transform, velocity, move_and_slide, state, ctx);
+    } else {
+        move_character(transform, velocity, move_and_slide, state, ctx);
+    }
 
     *velocity -= state.base_velocity;
 }
@@ -335,7 +343,7 @@ fn walk_move(
     };
 
     // Don't walk up stairs if not on ground.
-    if old_grounded.is_none() {
+    if old_grounded.is_none() && !ctx.cfg.step_from_air {
         *velocity -= state.base_velocity;
         return;
     }
@@ -396,7 +404,7 @@ fn step_move(
     );
 
     // If we either fall or slide, use the direct slide instead
-    if !hit.is_some_and(|h| h.normal1.y >= ctx.cfg.min_walk_cos) {
+    if !hit.is_some_and(|h| h.normal1.y >= ctx.cfg.min_walk_cos || ctx.cfg.step_into_air) {
         transform.translation = down_position;
         *velocity = down_velocity;
         return;
