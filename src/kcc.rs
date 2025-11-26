@@ -328,6 +328,14 @@ fn walk_move(
     if hit.is_none() {
         transform.translation += movement;
         state.velocity -= state.base_velocity;
+        let offset = move_and_slide.depenetrate(
+            state.collider(),
+            transform.translation,
+            transform.rotation,
+            &((&ctx.cfg.move_and_slide).into()),
+            &ctx.cfg.filter,
+        );
+        transform.translation += offset;
         stay_on_ground(transform, move_and_slide, state, ctx);
         return;
     };
@@ -399,6 +407,14 @@ fn step_move(
     };
     let hit = hit.unwrap();
     transform.translation += cast_dir * hit.distance;
+    let offset = move_and_slide.depenetrate(
+        state.collider(),
+        transform.translation,
+        transform.rotation,
+        &((&ctx.cfg.move_and_slide).into()),
+        &ctx.cfg.filter,
+    );
+    transform.translation += offset;
 
     let vec_up_pos = transform.translation;
 
@@ -473,6 +489,14 @@ fn stay_on_ground(
         return;
     }
     transform.translation = start + cast_dir * hit.distance;
+    let offset = move_and_slide.depenetrate(
+        state.collider(),
+        transform.translation,
+        transform.rotation,
+        &((&ctx.cfg.move_and_slide).into()),
+        &ctx.cfg.filter,
+    );
+    transform.translation += offset;
 }
 
 fn accelerate(
