@@ -188,7 +188,7 @@ fn run_kcc(
             dt: time.delta_secs(),
             dt_duration: time.delta(),
         };
-        depenetrate_character(&mut transform, &move_and_slide, &mut state, &ctx);
+        depenetrate_character(&mut transform, &move_and_slide, &state, &ctx);
 
         update_grounded(&mut transform, &velocity, &move_and_slide, &mut state, &ctx);
 
@@ -205,7 +205,7 @@ fn run_kcc(
         //  we don't slow when standing still, relative to the conveyor.
         if state.grounded.is_some() {
             velocity.y = 0.0;
-            friction(&mut velocity, &mut state, &ctx);
+            friction(&mut velocity, &state, &ctx);
         }
 
         validate_velocity(&mut velocity, &ctx);
@@ -339,7 +339,7 @@ fn walk_move(
     if hit.is_none() {
         transform.translation += movement;
         *velocity -= state.base_velocity;
-        depenetrate_character(transform, &move_and_slide, state, &ctx);
+        depenetrate_character(transform, move_and_slide, state, ctx);
         snap_to_ground(transform, move_and_slide, state, ctx);
         return;
     };
@@ -413,7 +413,7 @@ fn step_move(
     };
     let hit = hit.unwrap();
     transform.translation += cast_dir * hit.distance;
-    depenetrate_character(transform, &move_and_slide, state, &ctx);
+    depenetrate_character(transform, move_and_slide, state, ctx);
 
     let vec_up_pos = transform.translation;
 
@@ -500,7 +500,7 @@ fn snap_to_ground(
         return;
     }
     transform.translation = start + cast_dir * hit.distance;
-    depenetrate_character(transform, &move_and_slide, state, &ctx);
+    depenetrate_character(transform, move_and_slide, state, ctx);
 }
 
 fn accelerate(velocity: &mut Vec3, wish_velocity: Vec3, acceleration_hz: f32, ctx: &Ctx) {
