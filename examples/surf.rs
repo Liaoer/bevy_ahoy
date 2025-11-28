@@ -117,9 +117,6 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
     CharacterController {
         acceleration_hz: 10.0,
         air_acceleration_hz: 150.0,
-        // Uncomment these for Momentum Mod style surf
-        // speed: 6.0,
-        // gravity: 23.0,
         ..default()
     },
     RigidBody::Kinematic,
