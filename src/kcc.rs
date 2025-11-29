@@ -6,6 +6,7 @@ use bevy_ecs::{
     entity::EntityHashSet, intern::Interned, lifecycle::HookContext,
     relationship::RelationshipSourceCollection as _, schedule::ScheduleLabel, world::DeferredWorld,
 };
+use bevy_time::Stopwatch;
 use core::time::Duration;
 use std::sync::Arc;
 use tracing::warn;
@@ -28,6 +29,7 @@ pub(super) fn plugin(schedule: Interned<dyn ScheduleLabel>) -> impl Fn(&mut App)
     Collider = Collider::cylinder(0.7, 1.8),
     CustomPositionIntegration,
     Transform,
+    SpeculativeMargin::ZERO,
 )]
 #[component(on_add=CharacterController::on_add)]
 pub struct CharacterController {
@@ -51,6 +53,8 @@ pub struct CharacterController {
     pub jump_height: f32,
     pub max_air_speed: f32,
     pub unground_speed: f32,
+    pub coyote_time: Duration,
+    pub jump_input_buffer: Duration,
     pub step_from_air: bool,
     pub step_into_air: bool,
 }
@@ -81,6 +85,8 @@ impl Default for CharacterController {
             jump_height: 1.5,
             max_air_speed: 0.76,
             unground_speed: 10.0,
+            coyote_time: Duration::from_millis(150),
+            jump_input_buffer: Duration::from_millis(150),
             step_from_air: false,
             step_into_air: false,
         }
@@ -152,6 +158,7 @@ pub struct CharacterControllerState {
     pub grounded: Option<MoveHitData>,
     pub crouching: bool,
     pub touching_entities: EntityHashSet,
+    pub last_ground: Stopwatch,
 }
 
 impl CharacterControllerState {
@@ -168,7 +175,7 @@ fn run_kcc(
     mut kccs: Query<(
         &CharacterController,
         &mut CharacterControllerState,
-        &AccumulatedInput,
+        &mut AccumulatedInput,
         &mut Transform,
         &mut LinearVelocity,
         Option<&CharacterControllerCamera>,
@@ -177,30 +184,29 @@ fn run_kcc(
     time: Res<Time>,
     move_and_slide: MoveAndSlide,
 ) {
-    for (cfg, mut state, input, mut transform, mut velocity, cam) in &mut kccs {
+    for (cfg, mut state, mut input, mut transform, mut velocity, cam) in &mut kccs {
         state.touching_entities.clear();
+        state.last_ground.tick(time.delta());
 
         let ctx = Ctx {
             orientation: cam
                 .and_then(|e| cams.get(e.get()).copied().ok())
                 .unwrap_or(*transform),
             cfg: cfg.clone(),
-            input: *input,
+            input: input.clone(),
             dt: time.delta_secs(),
             dt_duration: time.delta(),
         };
         depenetrate_character(&mut transform, &move_and_slide, &state, &ctx);
 
-        update_grounded(&mut transform, &velocity, &move_and_slide, &mut state, &ctx);
+        update_grounded(&transform, &velocity, &move_and_slide, &mut state, &ctx);
 
         handle_crouching(*transform, &move_and_slide, &mut state, &ctx);
 
         // here we'd handle things like spectator, dead, noclip, etc.
         start_gravity(&mut velocity, &mut state, &ctx);
 
-        if input.jumped {
-            perform_jump(&mut velocity, &mut state, &ctx);
-        }
+        handle_jump(&mut velocity, &mut input, &mut state, &ctx);
 
         // Fricion is handled before we add in any base velocity. That way, if we are on a conveyor,
         //  we don't slow when standing still, relative to the conveyor.
@@ -232,13 +238,14 @@ fn run_kcc(
             );
         }
 
-        update_grounded(&mut transform, &velocity, &move_and_slide, &mut state, &ctx);
+        update_grounded(&transform, &velocity, &move_and_slide, &mut state, &ctx);
         validate_velocity(&mut velocity, &ctx);
 
         finish_gravity(&mut velocity, &ctx);
 
         if state.grounded.is_some() {
             velocity.y = 0.0;
+            state.last_ground.reset();
         }
         // TODO: check_falling();
     }
@@ -421,7 +428,7 @@ fn step_move(
     // use the one that wend further
     let down_dist = down_position.xz().distance_squared(original_position.xz());
     let up_dist = vec_up_pos.xz().distance_squared(original_position.xz());
-    if down_dist > up_dist {
+    if down_dist >= up_dist {
         transform.translation = down_position;
         *velocity = down_velocity;
         state.touching_entities = down_touching_entities;
@@ -524,7 +531,7 @@ fn accelerate(velocity: &mut Vec3, wish_velocity: Vec3, acceleration_hz: f32, ct
 }
 
 fn update_grounded(
-    transform: &mut Transform,
+    transform: &Transform,
     velocity: &Vec3,
     move_and_slide: &MoveAndSlide,
     state: &mut CharacterControllerState,
@@ -590,11 +597,23 @@ fn friction(velocity: &mut Vec3, state: &CharacterControllerState, ctx: &Ctx) {
     }
 }
 
-fn perform_jump(velocity: &mut Vec3, state: &mut CharacterControllerState, ctx: &Ctx) {
-    if state.grounded.is_none() {
+fn handle_jump(
+    velocity: &mut Vec3,
+    input: &mut AccumulatedInput,
+    state: &mut CharacterControllerState,
+    ctx: &Ctx,
+) {
+    let Some(jump_time) = input.jumped.clone() else {
+        return;
+    };
+    if (state.grounded.is_none() && state.last_ground.elapsed() > ctx.cfg.coyote_time)
+        || jump_time.elapsed() > ctx.cfg.jump_input_buffer
+    {
         return;
     }
+    input.jumped = None;
     state.grounded = None;
+    state.last_ground.set_elapsed(ctx.cfg.coyote_time);
 
     // TODO: read ground's jump factor
     let ground_factor = 1.0;
@@ -605,11 +624,7 @@ fn perform_jump(velocity: &mut Vec3, state: &mut CharacterControllerState, ctx: 
     // v^2 = g * g * 2.0 * 45 / g
     // v = sqrt( g * 2.0 * 45 )
     let fl_mul = (2.0 * ctx.cfg.gravity * ctx.cfg.jump_height).sqrt();
-    if state.crouching {
-        velocity.y = ground_factor * fl_mul;
-    } else {
-        velocity.y += ground_factor * fl_mul;
-    }
+    velocity.y = ground_factor * fl_mul;
 
     // TODO: Trigger jump event
 }
