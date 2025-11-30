@@ -39,6 +39,7 @@ fn run_kcc(
             &AngularVelocity,
             &ComputedCenterOfMass,
             &Position,
+            &Rotation,
         ),
         Without<CharacterController>,
     >,
@@ -439,6 +440,7 @@ fn update_grounded(
             &AngularVelocity,
             &ComputedCenterOfMass,
             &Position,
+            &Rotation,
         ),
         Without<CharacterController>,
     >,
@@ -457,7 +459,7 @@ fn update_grounded(
 
     let is_on_ladder = false;
     if moving_up_rapidly || (moving_up && is_on_ladder) {
-        set_grounded(None, velocity, colliders, state);
+        set_grounded(None, velocity, colliders, state, ctx);
     } else {
         let cast_dir = Dir3::NEG_Y;
         let cast_dist = if state.base_velocity.y < 0.0 {
@@ -476,9 +478,9 @@ fn update_grounded(
         if let Some(hit) = hit
             && hit.normal1.y >= ctx.cfg.min_walk_cos
         {
-            set_grounded(hit, velocity, colliders, state);
+            set_grounded(hit, velocity, colliders, state, ctx);
         } else {
-            set_grounded(None, velocity, colliders, state);
+            set_grounded(None, velocity, colliders, state, ctx);
             // TODO: set surface friction to 0.25 for some reason
         }
     }
@@ -494,26 +496,40 @@ fn set_grounded(
             &AngularVelocity,
             &ComputedCenterOfMass,
             &Position,
+            &Rotation,
         ),
         Without<CharacterController>,
     >,
     state: &mut CharacterControllerState,
+    ctx: &Ctx,
 ) {
     let new_ground = new_ground.into();
     let old_ground = state.grounded;
 
     if new_ground.is_none()
         && let Some(old_ground) = old_ground
-        && let Ok((ground_velocity, ang_vel, com, pos)) = colliders.get(old_ground.entity)
+        && let Ok((ground_velocity, ang_vel, com, pos, rot)) = colliders.get(old_ground.entity)
     {
         let axis = old_ground.point1 - (com.0 + pos.0);
         let combined_vel = ground_velocity.0 + ang_vel.0.cross(axis);
         state.base_velocity.y = combined_vel.y;
     } else if let Some(new_ground) = new_ground
-        && let Ok((ground_velocity, ang_vel, com, pos)) = colliders.get(new_ground.entity)
+        && let Ok((lin_vel, ang_vel, com, pos, rot)) = colliders.get(new_ground.entity)
     {
-        let axis = new_ground.point1 - (com.0 + pos.0);
-        state.base_velocity = ground_velocity.0 + ang_vel.0.cross(axis);
+        let platform_transform = Transform::IDENTITY
+            .with_translation(pos.0)
+            .with_rotation(rot.0);
+        let prev_platform_transform = Transform::IDENTITY
+            .with_translation(pos.0 - lin_vel.0 * ctx.dt)
+            .with_rotation(Quat::from_scaled_axis(-ang_vel.0 * ctx.dt) * rot.0);
+        let kcc_movement = platform_transform.transform_point(
+            prev_platform_transform
+                .compute_affine()
+                .inverse()
+                .transform_point3(new_ground.point1),
+        ) - new_ground.point1;
+
+        state.base_velocity = kcc_movement / ctx.dt;
     }
 
     state.grounded = new_ground;
@@ -555,6 +571,7 @@ fn handle_jump(
             &AngularVelocity,
             &ComputedCenterOfMass,
             &Position,
+            &Rotation,
         ),
         Without<CharacterController>,
     >,
@@ -570,7 +587,7 @@ fn handle_jump(
         return;
     }
     input.jumped = None;
-    set_grounded(None, velocity, colliders, state);
+    set_grounded(None, velocity, colliders, state, ctx);
     state.last_ground.set_elapsed(ctx.cfg.coyote_time);
 
     // TODO: read ground's jump factor
