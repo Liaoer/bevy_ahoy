@@ -1,4 +1,4 @@
-use std::f32::consts::TAU;
+use std::{f32::consts::TAU, time::Duration};
 
 use avian_pickup::actor::AvianPickupActor;
 
@@ -33,6 +33,7 @@ pub(crate) fn sync_camera_transform(
         (Without<CharacterControllerState>,),
     >,
     kccs: Query<(&Transform, &CharacterController, &CharacterControllerState)>,
+    time: Res<Time>,
 ) {
     // TODO: DIY TransformHelper to use current global transform.
     // Can't use GlobalTransform directly: outdated -> jitter
@@ -51,8 +52,28 @@ pub(crate) fn sync_camera_transform(
             } else {
                 cfg.standing_view_height
             };
-            camera_transform.translation =
+            let new_translation =
                 kcc_transform.translation + Vec3::Y * (-height / 2.0 + view_height);
+            camera_transform.translation.x = new_translation.x;
+            camera_transform.translation.z = new_translation.z;
+            let smooth_time = Duration::from_millis(300);
+            if state.last_step_up.elapsed() < smooth_time
+                || state.last_step_down.elapsed() < smooth_time
+            {
+                let decay_rate = f32::ln(50000.0);
+                camera_transform.translation.y.smooth_nudge(
+                    &new_translation.y,
+                    decay_rate,
+                    time.delta_secs(),
+                )
+            } else {
+                let decay_rate = f32::ln(100000.0);
+                camera_transform.translation.y.smooth_nudge(
+                    &new_translation.y,
+                    decay_rate,
+                    time.delta_secs(),
+                )
+            }
         }
     }
 }

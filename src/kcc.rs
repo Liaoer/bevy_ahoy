@@ -2,7 +2,7 @@ use bevy_ecs::{
     intern::Interned, relationship::RelationshipSourceCollection as _, schedule::ScheduleLabel,
 };
 use core::time::Duration;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{CharacterControllerState, input::AccumulatedInput, prelude::*};
 
@@ -37,6 +37,7 @@ fn run_kcc(
     for (cfg, mut state, mut input, mut transform, mut velocity, cam) in &mut kccs {
         state.touching_entities.clear();
         state.last_ground.tick(time.delta());
+        state.last_step_up.tick(time.delta());
 
         let ctx = Ctx {
             orientation: cam
@@ -294,7 +295,7 @@ fn step_move(
 
     let vec_up_pos = transform.translation;
 
-    // use the one that wend further
+    // use the one that went further
     let down_dist = down_position.xz().distance_squared(original_position.xz());
     let up_dist = vec_up_pos.xz().distance_squared(original_position.xz());
     if down_dist >= up_dist {
@@ -303,6 +304,7 @@ fn step_move(
         state.touching_entities = down_touching_entities;
     } else {
         velocity.y = down_velocity.y;
+        state.last_step_up.reset();
     }
 }
 
@@ -340,7 +342,7 @@ fn move_character(
 fn snap_to_ground(
     transform: &mut Transform,
     move_and_slide: &MoveAndSlide,
-    state: &CharacterControllerState,
+    state: &mut CharacterControllerState,
     ctx: &Ctx,
 ) {
     let cast_dir = Vec3::Y;
@@ -377,6 +379,9 @@ fn snap_to_ground(
         return;
     }
     transform.translation = start + cast_dir * hit.distance;
+    if hit.distance > ctx.cfg.step_down_detection_distance {
+        state.last_step_down.reset();
+    }
     depenetrate_character(transform, move_and_slide, state, ctx);
 }
 

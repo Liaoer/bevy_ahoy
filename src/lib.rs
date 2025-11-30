@@ -123,6 +123,7 @@ pub struct CharacterController {
     pub standing_view_height: f32,
     pub crouch_view_height: f32,
     pub ground_distance: f32,
+    pub step_down_detection_distance: f32,
     pub min_walk_cos: f32,
     pub stop_speed: f32,
     pub friction_hz: f32,
@@ -170,6 +171,7 @@ impl Default for CharacterController {
             jump_height: 1.5,
             max_air_speed: 0.76,
             unground_speed: 10.0,
+            step_down_detection_distance: 0.2,
             coyote_time: Duration::from_millis(150),
             jump_input_buffer: Duration::from_millis(150),
             step_from_air: false,
@@ -232,7 +234,7 @@ impl CharacterController {
     }
 }
 
-#[derive(Component, Clone, Reflect, Default, Debug)]
+#[derive(Component, Clone, Reflect, Debug)]
 #[reflect(Component)]
 pub struct CharacterControllerState {
     pub base_velocity: Vec3,
@@ -244,6 +246,31 @@ pub struct CharacterControllerState {
     pub crouching: bool,
     pub touching_entities: Vec<TouchingEntity>,
     pub last_ground: Stopwatch,
+    pub last_step_up: Stopwatch,
+    pub last_step_down: Stopwatch,
+}
+
+impl Default for CharacterControllerState {
+    fn default() -> Self {
+        Self {
+            base_velocity: Vec3::ZERO,
+            // late initialized
+            standing_collider: default(),
+            crouching_collider: default(),
+            grounded: None,
+            crouching: false,
+            touching_entities: Vec::new(),
+            last_ground: max_stopwatch(),
+            last_step_up: max_stopwatch(),
+            last_step_down: max_stopwatch(),
+        }
+    }
+}
+
+fn max_stopwatch() -> Stopwatch {
+    let mut watch = Stopwatch::new();
+    watch.set_elapsed(Duration::MAX);
+    watch
 }
 
 impl CharacterControllerState {
