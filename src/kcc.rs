@@ -38,6 +38,7 @@ fn run_kcc(
         state.touching_entities.clear();
         state.last_ground.tick(time.delta());
         state.last_step_up.tick(time.delta());
+        state.last_step_down.tick(time.delta());
 
         let ctx = Ctx {
             orientation: cam
@@ -378,8 +379,9 @@ fn snap_to_ground(
     {
         return;
     }
+    let original_position = transform.translation;
     transform.translation = start + cast_dir * hit.distance;
-    if hit.distance > ctx.cfg.step_down_detection_distance {
+    if original_position.y - transform.translation.y > ctx.cfg.step_down_detection_distance {
         state.last_step_down.reset();
     }
     depenetrate_character(transform, move_and_slide, state, ctx);

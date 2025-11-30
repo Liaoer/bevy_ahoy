@@ -174,7 +174,7 @@ impl Default for CharacterController {
             step_down_detection_distance: 0.2,
             coyote_time: Duration::from_millis(150),
             jump_input_buffer: Duration::from_millis(150),
-            step_from_air: false,
+            step_from_air: true,
             step_into_air: false,
         }
     }
