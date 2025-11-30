@@ -273,6 +273,22 @@ fn step_move(
     let dist = hit.map(|hit| hit.distance).unwrap_or(cast_len);
     transform.translation += cast_dir * dist;
 
+    // Verify we have enough space to stand
+    let hit = move_and_slide.cast_move(
+        state.collider(),
+        transform.translation,
+        transform.rotation,
+        velocity.normalize_or_zero() * ctx.cfg.min_step_ledge_space,
+        ctx.cfg.move_and_slide.skin_width,
+        &ctx.cfg.filter,
+    );
+    if hit.is_some() {
+        transform.translation = down_position;
+        *velocity = down_velocity;
+        state.touching_entities = down_touching_entities;
+        return;
+    }
+
     // try to slide from upstairs
     move_character(transform, velocity, move_and_slide, state, ctx);
 
@@ -290,6 +306,7 @@ fn step_move(
     if !hit.is_some_and(|h| h.normal1.y >= ctx.cfg.min_walk_cos || ctx.cfg.step_into_air) {
         transform.translation = down_position;
         *velocity = down_velocity;
+        state.touching_entities = down_touching_entities;
         return;
     };
     let hit = hit.unwrap();

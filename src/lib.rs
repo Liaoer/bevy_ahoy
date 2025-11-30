@@ -143,6 +143,7 @@ pub struct CharacterController {
     pub jump_input_buffer: Duration,
     pub step_from_air: bool,
     pub step_into_air: bool,
+    pub min_step_ledge_space: f32,
 }
 
 impl Default for CharacterController {
@@ -172,6 +173,7 @@ impl Default for CharacterController {
             max_air_speed: 0.76,
             unground_speed: 10.0,
             step_down_detection_distance: 0.2,
+            min_step_ledge_space: 0.5,
             coyote_time: Duration::from_millis(150),
             jump_input_buffer: Duration::from_millis(150),
             step_from_air: true,
