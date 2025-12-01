@@ -1,5 +1,6 @@
 use avian3d::prelude::*;
 use bevy::{
+    color::palettes::tailwind,
     ecs::{lifecycle::HookContext, world::DeferredWorld},
     gltf::GltfPlugin,
     image::{ImageAddressMode, ImageSamplerDescriptor},
@@ -36,6 +37,9 @@ fn main() -> AppExit {
                 })
                 .set(WindowPlugin {
                     primary_window: Window {
+                        #[cfg(target_arch = "wasm32")]
+                        resolution: WindowResolution::new(1280, 720),
+                        #[cfg(not(target_arch = "wasm32"))]
                         resolution: WindowResolution::new(1920, 1080),
                         fit_canvas_to_parent: true,
                         ..default()
@@ -70,6 +74,7 @@ fn main() -> AppExit {
             ExampleUtilPlugin,
         ))
         .add_input_context::<PlayerInput>()
+        .insert_resource(ClearColor(tailwind::SKY_200.into()))
         .add_systems(Startup, (setup, setup_velocity_text))
         .add_observer(spawn_player)
         .add_observer(setup_time)
@@ -311,7 +316,7 @@ fn setup_velocity_text(mut commands: Commands) {
                 top: px(75.0),
                 ..default()
             },
-            Text::default(),
+            Text::new("Loading... (this may take a while)"),
             TextColor(Color::WHITE.with_alpha(0.5)),
             VelocityText
         )],

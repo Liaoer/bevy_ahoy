@@ -34,7 +34,7 @@ bevy_mod_mipmap_generator = { git = "https://github.com/DGriffin91/bevy_mod_mipm
 avian3d = "0.4.1"
 bevy_framepace = "0.20.0"
 bevy_fix_cursor_unlock_web = "0.2.0"
-wasm-bindgen = "0.2.106"
+wasm-bindgen = "=0.2.106"
 
 [package.metadata.bevy_cli.unstable]
 #web-multi-threading = true

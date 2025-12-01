@@ -45,7 +45,7 @@ impl Plugin for ExampleUtilPlugin {
         .add_observer(tweak_directional_light)
         .add_observer(toggle_debug)
         .add_observer(unlock_cursor_web)
-        .insert_resource(DirectionalLightShadowMap { size: 4096 * 2 })
+        .insert_resource(DirectionalLightShadowMap { size: 4096 })
         .add_systems(Update, turn_sun)
         .add_input_context::<DebugInput>()
         // For debug printing
