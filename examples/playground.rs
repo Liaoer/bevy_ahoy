@@ -72,15 +72,14 @@ struct Player;
 struct SpawnPlayer;
 
 fn spawn_player(
-    insert: On<Insert, SpawnPlayer>,
+    insert: On<Add, SpawnPlayer>,
     players: Query<Entity, With<Player>>,
     spawner: Query<&Transform>,
     camera: Single<Entity, With<Camera3d>>,
     mut commands: Commands,
 ) {
-    for player in players {
-        // Respawn the player on hot-reloads
-        commands.entity(player).despawn();
+    if !players.is_empty() {
+        return;
     }
     let Ok(transform) = spawner.get(insert.entity).copied() else {
         return;
@@ -142,6 +141,22 @@ impl PlayerInput {
                         KeyCode::Space,
                         GamepadButton::South,
                         Binding::mouse_wheel(),
+                    ],
+                ),
+                (
+                    Action::<Crane>::new(),
+                    Press::default(),
+                    bindings![
+                        KeyCode::Space,
+                        GamepadButton::South,
+                    ],
+                ),
+                (
+                    Action::<Mantle>::new(),
+                    Hold::new(0.2),
+                    bindings![
+                        KeyCode::Space,
+                        GamepadButton::South,
                     ],
                 ),
                 (
