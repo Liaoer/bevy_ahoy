@@ -1,15 +1,11 @@
-use avian3d::character_controller::move_and_slide::{self, MoveHitData};
+use avian3d::character_controller::move_and_slide::MoveHitData;
 use bevy_ecs::{
     intern::Interned,
     query::QueryData,
     schedule::ScheduleLabel,
-    system::{
-        SystemParam,
-        lifetimeless::{Read, Write},
-    },
+    system::lifetimeless::{Read, Write},
 };
 use core::fmt::Debug;
-use core::time::Duration;
 use tracing::{info, warn};
 
 use crate::{CharacterControllerState, input::AccumulatedInput, prelude::*};
@@ -476,9 +472,6 @@ fn update_grounded(
     // TODO: fire ground changed event
 }
 
-/// Needed to improve stability when `n.dot(dir)` happens to be very close to zero.
-const DOT_EPSILON: f32 = 0.005;
-
 fn cast_move(
     movement: Vec3,
     move_and_slide: &MoveAndSlide,
@@ -491,28 +484,6 @@ fn cast_move(
         movement,
         ctx.cfg.move_and_slide.skin_width,
         &ctx.cfg.filter,
-    )
-}
-
-fn cast_shape(
-    movement: Vec3,
-    move_and_slide: &MoveAndSlide,
-    ctx: &mut CtxItem,
-) -> Option<ShapeHitData> {
-    let (direction, distance) = Dir3::new_and_length(movement).unwrap_or((Dir3::X, 0.0));
-
-    move_and_slide.query_pipeline.cast_shape_predicate(
-        ctx.state.collider(),
-        ctx.transform.translation,
-        ctx.transform.rotation,
-        direction,
-        &ShapeCastConfig {
-            ..ShapeCastConfig::from_max_distance(distance)
-        },
-        &ctx.cfg.filter,
-        // Make sure we don't hit sensors.
-        // TODO: Replace this when spatial queries support excluding sensors directly.
-        &|entity| move_and_slide.colliders.contains(entity),
     )
 }
 
@@ -621,7 +592,7 @@ fn handle_jump(time: &Time, colliders: &Query<ColliderComponents>, ctx: &mut Ctx
     // TODO: Trigger jump event
 }
 
-#[expect(unused_variables, unreachable_code)]
+#[expect(unused_variables, reason = "WIP")]
 fn handle_mantle(
     time: &Time,
     colliders: &Query<ColliderComponents>,
@@ -631,15 +602,12 @@ fn handle_mantle(
     let Some(mantle_time) = ctx.input.mantled.clone() else {
         return;
     };
-    if mantle_time.elapsed() > ctx.cfg.mantle_input_buffer {
-        return;
-    }
+    if mantle_time.elapsed() > ctx.cfg.mantle_input_buffer {}
     // High level overview:
     // - move cast up
     // - translate a bit with horizontal movement
     // - move cast down
     // - move cast a bit back
-    return;
 }
 
 fn start_gravity(time: &Time, ctx: &mut CtxItem) {
