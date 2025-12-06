@@ -307,8 +307,8 @@ fn handle_crane_movement(
             ctx.transform.translation += cast_dir * speed * time.delta_secs();
             depenetrate_character(move_and_slide, ctx);
             ctx.state.in_crane = None;
-            return;
         }
+        return;
     }
 
     let cast_dir = vel_dir;
