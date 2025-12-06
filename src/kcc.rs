@@ -273,7 +273,6 @@ fn handle_crane_movement(
     ctx: &mut CtxItem,
 ) {
     ctx.state.last_step_up.reset();
-    error!("a");
     ctx.velocity.y = 0.0;
     ground_accelerate(wish_velocity, ctx.cfg.acceleration_hz, time, ctx);
     ctx.velocity.y = 0.0;
@@ -323,11 +322,9 @@ fn update_in_crane(
     ctx: &mut CtxItem,
 ) {
     if ctx.state.in_crane.is_some() {
-        info!("a");
         return;
     }
     let Some(crane_time) = ctx.input.craned.clone() else {
-        info!("b");
         return;
     };
     if crane_time.elapsed() > ctx.cfg.crane_input_buffer {
@@ -342,7 +339,6 @@ fn update_in_crane(
     ctx.velocity.0 += ctx.state.base_velocity;
 
     let Ok(vel_dir) = Dir3::new(ctx.velocity.0) else {
-        info!("d");
         ctx.velocity.0 = original_velocity;
         return;
     };
@@ -352,14 +348,12 @@ fn update_in_crane(
     let cast_len = ctx.cfg.min_crane_ledge_space;
     let Some(wall_hit) = cast_move(cast_dir * cast_len, move_and_slide, ctx) else {
         // nothing to move onto
-        info!("e");
         ctx.velocity.0 = original_velocity;
         return;
     };
     let wall_normal = vec3(wall_hit.normal1.x, 0.0, wall_hit.normal1.z).normalize_or_zero();
 
     if (-wall_normal).dot(*vel_dir) < ctx.cfg.min_crane_cos {
-        info!("f");
         ctx.velocity.0 = original_velocity;
         return;
     }
@@ -384,7 +378,6 @@ fn update_in_crane(
     else {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
-        info!("g");
         return;
     };
     let crane_height = up_dist - down_dist;
@@ -403,7 +396,6 @@ fn update_in_crane(
     if cast_move(cast_dir * cast_len, move_and_slide, ctx).is_some() {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
-        info!("i");
         return;
     };
     ctx.transform.translation += cast_dir * cast_len;
@@ -416,13 +408,11 @@ fn update_in_crane(
     let Some(hit) = hit else {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
-        info!("j");
         return;
     };
     if hit.normal1.y < ctx.cfg.min_walk_cos {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
-        info!("k");
         return;
     }
 
