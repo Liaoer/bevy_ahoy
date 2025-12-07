@@ -483,7 +483,7 @@ fn move_character(time: &Time, move_and_slide: &MoveAndSlide, ctx: &mut CtxItem)
         },
     );
     let lost_velocity = (ctx.velocity.0 - out.projected_velocity).length();
-    ctx.state.tac_velocity = ctx.state.tac_velocity * 0.9 + lost_velocity;
+    ctx.state.tac_velocity = ctx.state.tac_velocity * 0.99 + lost_velocity;
     ctx.transform.translation = out.position;
     ctx.velocity.0 = out.projected_velocity;
     std::mem::swap(&mut ctx.state.touching_entities, &mut touching_entities);
@@ -697,7 +697,6 @@ fn handle_jump(
         // Cancel velocity that would be lost to move_and_slide if tac is buffered
         let vel_dot = ctx.velocity.0.dot(normal).min(0.0);
         ctx.velocity.0 -= vel_dot * normal;
-        ctx.state.last_tac.reset();
         let groundedness = ctx.state.tac_velocity.max(vel_dot).min(1.0);
         ctx.state.tac_velocity = 0.0;
         let tac_wish = wish_unit - (wish_dot.min(0.0) - 1.0) * normal;
@@ -710,6 +709,7 @@ fn handle_jump(
         ctx.state.last_ground.set_elapsed(ctx.cfg.coyote_time);
         Vec3::Y
     };
+    ctx.state.last_tac.reset();
 
     ctx.input.jumped = None;
     tracing::info!("jump");
