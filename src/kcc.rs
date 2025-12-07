@@ -659,9 +659,7 @@ fn handle_tac(
     move_and_slide: &MoveAndSlide,
     ctx: &mut CtxItem,
 ) -> Option<Vec3> {
-    let Some(tac_time) = ctx.input.tac.clone() else {
-        return None;
-    };
+    let tac_time = ctx.input.tac.clone()?;
     if tac_time.elapsed() > ctx.cfg.tac_input_buffer {
         return None;
     }
