@@ -555,6 +555,7 @@ fn update_crane_state(
     ctx.input.craned = None;
     // Ensure we don't immediately jump on the surface if crane and jump are bound to the same key
     ctx.input.jumped = None;
+    ctx.input.tac = None;
 
     ctx.state.crane_height_left = Some(crane_height);
 }
@@ -866,6 +867,49 @@ fn friction(time: &Time, ctx: &mut CtxItem) {
     }
 }
 
+fn handle_tac(
+    wish_velocity: Vec3,
+    time: &Time,
+    move_and_slide: &MoveAndSlide,
+    ctx: &mut CtxItem,
+) -> Option<Vec3> {
+    let tac_time = ctx.input.tac.clone()?;
+    if tac_time.elapsed() > ctx.cfg.tac_input_buffer {
+        return None;
+    }
+    if wish_velocity.length_squared() < 0.1 || ctx.state.last_tac.elapsed() < ctx.cfg.tac_cooldown {
+        return None;
+    }
+    let normal = if let Some(hit) =
+        cast_move(ctx.velocity.0 * time.delta_secs(), move_and_slide, ctx)
+    {
+        hit.normal1
+    } else if let Some(hit) = cast_move(wish_velocity * time.delta_secs(), move_and_slide, ctx) {
+        hit.normal1
+    } else {
+        // No wall to tic tac off of, we're in free-fall.
+        return None;
+    };
+    // Don't tac off of ceilings/overhangs
+    if normal.y < -0.01 {
+        return None;
+    }
+    let wish_unit = wish_velocity.normalize();
+    let wish_dot = wish_unit.dot(normal);
+    if -wish_dot > ctx.cfg.max_tac_cos {
+        return None;
+    }
+    // Cancel velocity that would be lost to move_and_slide if tac is buffered
+    let vel_dot = ctx.velocity.0.dot(normal).min(0.0);
+    ctx.velocity.0 -= vel_dot * normal;
+    let groundedness = ctx.state.tac_velocity.max(vel_dot).min(1.0);
+    ctx.state.tac_velocity = 0.0;
+    let flat_normal = Vec3::new(normal.x, 0.0, normal.z);
+    let tac_wish = wish_unit - (wish_dot.min(0.0) - 1.0) * flat_normal;
+    let tac_dir = (Vec3::Y * ctx.cfg.tac_jump_factor + tac_wish).normalize();
+    Some(tac_dir * groundedness * ctx.cfg.tac_power)
+}
+
 fn handle_jump(
     wish_velocity: Vec3,
     time: &Time,
@@ -873,59 +917,30 @@ fn handle_jump(
     move_and_slide: &MoveAndSlide,
     ctx: &mut CtxItem,
 ) {
-    let Some(jump_time) = ctx.input.jumped.clone() else {
-        return;
-    };
-    if jump_time.elapsed() > ctx.cfg.jump_input_buffer {
-        return;
-    }
     // Handle tic tacs when we're in the air beyond coyote-time.
-    let jumpdir = if ctx.state.grounded.is_none()
-        && ctx.state.last_ground.elapsed() > ctx.cfg.coyote_time
-    {
-        if wish_velocity.length_squared() < 0.1
-            || ctx.state.last_tac.elapsed() < ctx.cfg.tac_cooldown
-        {
-            return;
-        }
-        let normal = if let Some(hit) =
-            cast_move(ctx.velocity.0 * time.delta_secs(), move_and_slide, ctx)
-        {
-            hit.normal1
-        } else if let Some(hit) = cast_move(wish_velocity * time.delta_secs(), move_and_slide, ctx)
-        {
-            hit.normal1
+    let jumpdir =
+        if ctx.state.grounded.is_none() && ctx.state.last_ground.elapsed() > ctx.cfg.coyote_time {
+            if let Some(tac_dir) = handle_tac(wish_velocity, time, move_and_slide, ctx) {
+                tac_dir
+            } else {
+                return;
+            }
         } else {
-            // No wall to tic tac off of, we're in free-fall.
-            return;
+            let Some(jump_time) = ctx.input.jumped.clone() else {
+                return;
+            };
+            if jump_time.elapsed() > ctx.cfg.jump_input_buffer {
+                return;
+            }
+            set_grounded(None, colliders, time, ctx);
+            // set last_ground to coyote time to make it not jump again after jumping ungrounds us
+            ctx.state.last_ground.set_elapsed(ctx.cfg.coyote_time);
+            Vec3::Y
         };
-        // Don't tac off of ceilings/overhangs
-        if normal.y < -0.01 {
-            return;
-        }
-        let wish_unit = wish_velocity.normalize();
-        let wish_dot = wish_unit.dot(normal);
-        if -wish_dot > ctx.cfg.max_tac_cos {
-            return;
-        }
-        // Cancel velocity that would be lost to move_and_slide if tac is buffered
-        let vel_dot = ctx.velocity.0.dot(normal).min(0.0);
-        ctx.velocity.0 -= vel_dot * normal;
-        let groundedness = ctx.state.tac_velocity.max(vel_dot).min(1.0);
-        ctx.state.tac_velocity = 0.0;
-        let tac_wish = wish_unit - (wish_dot.min(0.0) - 1.0) * normal;
-        // not sure if this is better (reflection)
-        //let tac_wish = wish_unit - (wish_dot.min(0.0) * 2.0) * normal;
-        (Vec3::Y * ctx.cfg.tac_jump_factor + tac_wish).normalize() * groundedness
-    } else {
-        set_grounded(None, colliders, time, ctx);
-        // set last_ground to coyote time to make it not jump again after jumping ungrounds us
-        ctx.state.last_ground.set_elapsed(ctx.cfg.coyote_time);
-        Vec3::Y
-    };
     ctx.state.last_tac.reset();
 
     ctx.input.jumped = None;
+    ctx.input.tac = None;
 
     // TODO: read ground's jump factor
     let ground_factor = 1.0;
