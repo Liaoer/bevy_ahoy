@@ -161,6 +161,8 @@ pub struct CharacterController {
     pub min_mantle_cos: f32,
     pub crane_speed: f32,
     pub mantle_speed: f32,
+    pub min_ledge_grab_space: Cuboid,
+    pub max_ledge_grab_distance: f32,
 }
 
 impl Default for CharacterController {
@@ -210,6 +212,8 @@ impl Default for CharacterController {
             mantle_height: 2.0,
             crane_speed: 11.0,
             mantle_speed: 1.0,
+            min_ledge_grab_space: Cuboid::new(0.2, 0.1, 0.2),
+            max_ledge_grab_distance: 0.5,
         }
     }
 }
@@ -223,11 +227,11 @@ impl CharacterController {
             kcc.filter.excluded_entities.add(ctx.entity);
         }
 
-        let crouch_height = {
+        let (crouch_height, min_ledge_grab_space) = {
             let Some(kcc) = world.get::<Self>(ctx.entity) else {
                 return;
             };
-            kcc.crouch_height
+            (kcc.crouch_height, kcc.min_ledge_grab_space)
         };
 
         let Some(collider) = world.entity(ctx.entity).get::<Collider>().cloned() else {
@@ -265,6 +269,8 @@ impl CharacterController {
             Rotation::default(),
             crouching_collider,
         )]);
+
+        state.hand_collider = Collider::from(min_ledge_grab_space);
     }
 }
 
@@ -276,6 +282,8 @@ pub struct CharacterControllerState {
     pub standing_collider: Collider,
     #[reflect(ignore)]
     pub crouching_collider: Collider,
+    #[reflect(ignore)]
+    pub hand_collider: Collider,
     pub grounded: Option<MoveHitData>,
     pub crouching: bool,
     pub tac_velocity: f32,
@@ -295,6 +303,7 @@ impl Default for CharacterControllerState {
             // late initialized
             standing_collider: default(),
             crouching_collider: default(),
+            hand_collider: default(),
             grounded: None,
             crouching: false,
             tac_velocity: 0.0,
@@ -321,6 +330,55 @@ impl CharacterControllerState {
             &self.crouching_collider
         } else {
             &self.standing_collider
+        }
+    }
+
+    pub fn radius(&self) -> f32 {
+        match self.collider().shape_scaled().as_typed_shape() {
+            avian3d::parry::shape::TypedShape::Ball(ball) => ball.radius,
+            avian3d::parry::shape::TypedShape::Cuboid(cuboid) => cuboid.half_extents.max(),
+            avian3d::parry::shape::TypedShape::Capsule(capsule) => capsule.radius,
+            avian3d::parry::shape::TypedShape::Segment(segment) => segment.length() / 2.0,
+            avian3d::parry::shape::TypedShape::Triangle(triangle) => triangle.circumcircle().1,
+            avian3d::parry::shape::TypedShape::Voxels(voxels) => {
+                voxels.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::TriMesh(tri_mesh) => {
+                tri_mesh.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::Polyline(polyline) => {
+                polyline.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::HalfSpace(_half_space) => f32::INFINITY,
+            avian3d::parry::shape::TypedShape::HeightField(height_field) => {
+                height_field.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::Compound(compound) => {
+                compound.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::ConvexPolyhedron(convex_polyhedron) => {
+                convex_polyhedron.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::Cylinder(cylinder) => cylinder.radius,
+            avian3d::parry::shape::TypedShape::Cone(cone) => cone.radius,
+            avian3d::parry::shape::TypedShape::RoundCuboid(round_shape) => {
+                round_shape.border_radius + round_shape.inner_shape.half_extents.max()
+            }
+            avian3d::parry::shape::TypedShape::RoundTriangle(round_shape) => {
+                round_shape.border_radius + round_shape.inner_shape.circumcircle().1
+            }
+            avian3d::parry::shape::TypedShape::RoundCylinder(round_shape) => {
+                round_shape.border_radius + round_shape.inner_shape.radius
+            }
+            avian3d::parry::shape::TypedShape::RoundCone(round_shape) => {
+                round_shape.border_radius + round_shape.inner_shape.radius
+            }
+            avian3d::parry::shape::TypedShape::RoundConvexPolyhedron(round_shape) => {
+                round_shape.border_radius + round_shape.inner_shape.local_bounding_sphere().radius()
+            }
+            avian3d::parry::shape::TypedShape::Custom(shape) => {
+                shape.compute_local_bounding_sphere().radius()
+            }
         }
     }
 }

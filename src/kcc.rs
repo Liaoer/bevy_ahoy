@@ -7,7 +7,7 @@ use bevy_ecs::{
 };
 use core::fmt::Debug;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::{CharacterControllerState, input::AccumulatedInput, prelude::*};
 
@@ -567,6 +567,7 @@ fn update_mantle_state(
     ctx: &mut CtxItem,
 ) {
     if ctx.state.mantle_height_left.is_some() {
+        info!("a");
         return;
     }
     let Some(mantle_time) = ctx.input.mantled.clone() else {
@@ -584,6 +585,7 @@ fn update_mantle_state(
         vel_dir
     } else {
         ctx.velocity.0 = original_velocity;
+        info!("d");
         return;
     };
 
@@ -593,17 +595,21 @@ fn update_mantle_state(
     ctx.velocity.0 += ctx.state.base_velocity;
 
     // Check wall
+    let radius = ctx.state.radius();
     let cast_dir = wish_dir;
-    let cast_len = ctx.cfg.min_mantle_ledge_space;
-    let Some(wall_hit) = cast_move(cast_dir * cast_len, move_and_slide, ctx) else {
+    let max_wall_dist = ctx.cfg.max_ledge_grab_distance + radius;
+    let cast_len = max_wall_dist;
+    let Some(wall_hit) = cast_move_hands(cast_dir * cast_len, move_and_slide, ctx) else {
         // nothing to move onto
         ctx.velocity.0 = original_velocity;
+        info!("e");
         return;
     };
     let wall_normal = vec3(wall_hit.normal1.x, 0.0, wall_hit.normal1.z).normalize_or_zero();
 
     if (-wall_normal).dot(*wish_dir) < ctx.cfg.min_mantle_cos {
         ctx.velocity.0 = original_velocity;
+        info!(?wall_normal, ?wish_dir, "f");
         return;
     }
 
@@ -611,24 +617,28 @@ fn update_mantle_state(
     let cast_dir = Dir3::Y;
     let cast_len = ctx.cfg.mantle_height;
 
-    let hit = cast_move(cast_dir * cast_len, move_and_slide, ctx);
-
-    let up_dist = hit.map(|hit| hit.distance).unwrap_or(cast_len);
+    let up_dist = cast_move_hands(cast_dir * cast_len, move_and_slide, ctx)
+        .map(|hit| hit.distance)
+        .unwrap_or(cast_len);
     ctx.transform.translation += cast_dir * up_dist;
 
     // Move onto ledge (penetration explicitly allowed since the ledge can be below a wall)
-    ctx.transform.translation += -wall_normal * ctx.cfg.min_mantle_ledge_space;
+    ctx.transform.translation += -wall_normal * max_wall_dist;
 
     // Move down
     let cast_dir = Dir3::NEG_Y;
     let cast_len = up_dist;
     let Some(down_dist) =
-        cast_move(cast_dir * cast_len, move_and_slide, ctx).map(|hit| hit.distance)
+        cast_move_hands(cast_dir * cast_len, move_and_slide, ctx).map(|hit| hit.distance)
     else {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
+        info!("g");
         return;
     };
+    ctx.transform.translation += cast_dir * down_dist;
+    error!("a");
+
     let mantle_height = up_dist - down_dist;
 
     // Okay, we found a potentially mantle!
@@ -641,27 +651,33 @@ fn update_mantle_state(
 
     // make sure we have enough space to land
     let cast_dir = -wall_normal;
-    let cast_len = ctx.cfg.min_mantle_ledge_space;
-    if cast_move(cast_dir * cast_len, move_and_slide, ctx).is_some() {
+    let min_dist = radius + ctx.cfg.min_ledge_grab_space.half_size.z;
+    let cast_len = min_dist + ctx.cfg.max_ledge_grab_distance;
+    if cast_move_hands(cast_dir * cast_len, move_and_slide, ctx)
+        .is_some_and(|h| h.distance < min_dist)
+    {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
+        info!("i");
         return;
     };
     ctx.transform.translation += cast_dir * cast_len;
 
     let cast_dir = Dir3::NEG_Y;
     let cast_len = mantle_height;
-    let hit = cast_move(cast_dir * cast_len, move_and_slide, ctx);
+    let hit = cast_move_hands(cast_dir * cast_len, move_and_slide, ctx);
 
     // If this doesn't hit, our mantle was actually going through geometry. Bail.
     let Some(hit) = hit else {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
+        info!("j");
         return;
     };
     if hit.normal1.y < ctx.cfg.min_walk_cos {
         ctx.transform.translation = original_position;
         ctx.velocity.0 = original_velocity;
+        info!("k");
         return;
     }
 
@@ -675,6 +691,7 @@ fn update_mantle_state(
     ctx.input.jumped = None;
 
     ctx.state.mantle_height_left = Some(mantle_height);
+    error!("success");
 }
 
 fn move_character(time: &Time, move_and_slide: &MoveAndSlide, ctx: &mut CtxItem) {
@@ -786,6 +803,40 @@ fn cast_move(movement: Vec3, move_and_slide: &MoveAndSlide, ctx: &CtxItem) -> Op
         ctx.cfg.move_and_slide.skin_width,
         &ctx.cfg.filter,
     )
+}
+
+#[must_use]
+fn cast_move_hands(
+    movement: Vec3,
+    move_and_slide: &MoveAndSlide,
+    ctx: &CtxItem,
+) -> Option<MoveHitData> {
+    move_and_slide.cast_move(
+        &ctx.state.hand_collider,
+        ctx.transform.translation,
+        ctx.transform.rotation,
+        movement,
+        ctx.cfg.move_and_slide.skin_width,
+        &ctx.cfg.filter,
+    )
+}
+
+#[must_use]
+fn hands_intersect(move_and_slide: &MoveAndSlide, ctx: &CtxItem) -> bool {
+    let mut intersects = false;
+    move_and_slide.intersections(
+        ctx.state.collider(),
+        ctx.transform.translation,
+        ctx.transform.rotation,
+        // Need a higher distance than skin width since we assume we're corrently not intersecting anything
+        ctx.cfg.move_and_slide.skin_width * 2.0,
+        &ctx.cfg.filter,
+        |_contact_point, _normal| {
+            intersects = true;
+            false
+        },
+    );
+    intersects
 }
 
 fn set_grounded(
