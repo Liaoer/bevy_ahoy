@@ -565,24 +565,43 @@ fn update_mantle_state(
 ) {
     if ctx.state.crane_height_left.is_some() {
         ctx.state.mantle_height_left = None;
+        info!("+a");
         return;
     }
     if ctx.state.mantle_height_left.is_some() && ctx.input.jumped.is_some() {
         ctx.input.jumped = None;
         ctx.state.mantle_height_left = None;
+        info!("+b");
         return;
     }
-    let Some(mantle_time) = ctx.input.mantled.clone() else {
-        return;
-    };
-    if mantle_time.elapsed() > ctx.cfg.mantle_input_buffer {
-        return;
+    if ctx.state.mantle_height_left.is_none() {
+        let Some(mantle_time) = ctx.input.mantled.clone() else {
+            info!("+c");
+            return;
+        };
+        if mantle_time.elapsed() > ctx.cfg.mantle_input_buffer {
+            info!("+d");
+            return;
+        }
     }
-    let Some(mantle_height) = available_mantle_height(wish_velocity, time, move_and_slide, ctx)
-    else {
+    let Some(mantle_height) = available_ledge_height(
+        wish_velocity,
+        ctx.cfg.min_crane_ledge_space,
+        ctx.cfg.min_crane_cos,
+        ctx.cfg.crane_height
+            + ctx.cfg.mantle_height
+            + ctx.cfg.climb_pull_up_height
+            + ctx.cfg.move_and_slide.skin_width,
+        time,
+        move_and_slide,
+        ctx,
+    )
+    .or_else(|| available_mantle_height(wish_velocity, time, move_and_slide, ctx)) else {
         ctx.state.mantle_height_left = None;
+        info!("+e");
         return;
     };
+    info!(?mantle_height);
 
     ctx.input.craned = None;
     ctx.input.mantled = None;
