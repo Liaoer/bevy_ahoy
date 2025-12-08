@@ -588,6 +588,10 @@ fn update_mantle_state(
     move_and_slide: &MoveAndSlide,
     ctx: &mut CtxItem,
 ) {
+    if ctx.state.crane_height_left.is_some() {
+        ctx.state.mantle_height_left = None;
+        return;
+    }
     if ctx.state.mantle_height_left.is_some() {
         info!("a");
         return;
