@@ -361,24 +361,8 @@ fn handle_mantle_movement(
     };
 
     // Find closest wall
-    let mut closest_wall = None;
-    move_and_slide.intersections(
-        ctx.state.collider(),
-        ctx.transform.translation,
-        ctx.transform.rotation,
-        ctx.cfg.climb_wall_distance + ctx.cfg.move_and_slide.skin_width,
-        &ctx.cfg.filter,
-        |contact_point, normal| {
-            if normal.y.abs() < ctx.cfg.min_walk_cos
-                && !closest_wall
-                    .is_some_and(|(penetration, _)| penetration < contact_point.penetration)
-            {
-                closest_wall = Some((contact_point.penetration, normal));
-            }
-            true
-        },
-    );
-    let Some((wall_dist, wall_normal)) = closest_wall else {
+    let closest_wall = closest_wall_normal(ctx.cfg.climb_wall_distance, move_and_slide, ctx);
+    let Some(wall_normal) = closest_wall else {
         // floating in air, bail
         ctx.state.mantle_height_left = None;
         info!("a");
@@ -599,10 +583,9 @@ fn available_mantle_height(
 
     let wish_dir = if let Ok(wish_dir) = Dir3::new(wish_velocity) {
         wish_dir
-    } else if let Ok(vel_dir) = Dir3::new(ctx.velocity.0) {
+    } else if let Ok(vel_dir) = Dir3::new(vec3(ctx.velocity.x, 0.0, ctx.velocity.z)) {
         vel_dir
     } else {
-        ctx.velocity.0 = original_velocity;
         return None;
     };
 
@@ -614,11 +597,7 @@ fn available_mantle_height(
     // Check wall
     let radius = ctx.state.radius();
     let cast_dir = wish_dir;
-    let hand_to_wall_dist = ctx.cfg.climb_wall_distance
-        + radius
-        + ctx.cfg.move_and_slide.skin_width
-        + ctx.cfg.min_ledge_grab_space.half_size.z;
-    let cast_len = hand_to_wall_dist;
+    let cast_len = ctx.cfg.climb_wall_distance;
     let Some(wall_hit) = cast_move(cast_dir * cast_len, move_and_slide, ctx) else {
         // nothing to move onto
         ctx.velocity.0 = original_velocity;
@@ -644,6 +623,10 @@ fn available_mantle_height(
         .unwrap_or(cast_len);
     ctx.transform.translation += cast_dir * up_dist;
 
+    let hand_to_wall_dist = ctx.cfg.climb_wall_distance
+        + radius
+        + ctx.cfg.move_and_slide.skin_width
+        + ctx.cfg.min_ledge_grab_space.half_size.z;
     // Move onto ledge (penetration explicitly allowed since the ledge can be below a wall)
     ctx.transform.translation += -wall_normal * hand_to_wall_dist;
 
@@ -659,7 +642,7 @@ fn available_mantle_height(
     };
     ctx.transform.translation += cast_dir * down_dist;
 
-    let mantle_height = up_dist - down_dist;
+    let ledge_height = up_dist - down_dist;
 
     // Okay, we found a potential mantle!
     ctx.transform.translation = original_position
@@ -667,7 +650,7 @@ fn available_mantle_height(
         + wall_normal * ctx.cfg.climb_wall_distance;
 
     // step up
-    ctx.transform.translation.y += mantle_height;
+    ctx.transform.translation.y += ledge_height;
 
     // check the full mantle
 
@@ -682,24 +665,27 @@ fn available_mantle_height(
     ctx.transform.translation += cast_dir * cast_len;
 
     let cast_dir = Dir3::NEG_Y;
-    let cast_len = mantle_height;
+    let cast_len = ledge_height;
     let hit = cast_move_hands(cast_dir * cast_len, move_and_slide, ctx);
-
-    // If this doesn't hit, our mantle was actually going through geometry. Bail.
-    let Some(hit) = hit else {
-        ctx.transform.translation = original_position;
-        ctx.velocity.0 = original_velocity;
-        return None;
-    };
-    if hit.normal1.y < ctx.cfg.min_walk_cos {
-        ctx.transform.translation = original_position;
-        ctx.velocity.0 = original_velocity;
-        return None;
-    }
 
     // Reset KCC from speculative mantle to actual current state
     ctx.transform.translation = original_position;
     ctx.velocity.0 = original_velocity;
+
+    // If this doesn't hit, our mantle was actually going through geometry. Bail.
+    let Some(hit) = hit else {
+        return None;
+    };
+    if hit.normal1.y < ctx.cfg.min_walk_cos {
+        return None;
+    }
+
+    let kcc_height = ctx.state.pos_to_head_dist();
+    let mantle_height = ledge_height - kcc_height + ctx.cfg.climb_pull_up_height;
+
+    if mantle_height < 0.0 {
+        return None;
+    }
 
     Some(mantle_height)
 }
@@ -762,6 +748,27 @@ fn snap_to_ground(move_and_slide: &MoveAndSlide, ctx: &mut CtxItem) {
         ctx.state.last_step_down.reset();
     }
     depenetrate_character(move_and_slide, ctx);
+}
+
+fn closest_wall_normal(dist: f32, move_and_slide: &MoveAndSlide, ctx: &CtxItem) -> Option<Dir3> {
+    let mut closest_wall = None;
+    move_and_slide.intersections(
+        ctx.state.collider(),
+        ctx.transform.translation,
+        ctx.transform.rotation,
+        dist + ctx.cfg.move_and_slide.skin_width,
+        &ctx.cfg.filter,
+        |contact_point, normal| {
+            if normal.y.abs() < ctx.cfg.min_walk_cos
+                && !closest_wall
+                    .is_some_and(|(penetration, _)| penetration < contact_point.penetration)
+            {
+                closest_wall = Some((contact_point.penetration, normal));
+            }
+            true
+        },
+    );
+    closest_wall.map(|(_, normal)| normal)
 }
 
 fn update_grounded(

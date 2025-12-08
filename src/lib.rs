@@ -163,6 +163,7 @@ pub struct CharacterController {
     pub mantle_speed: f32,
     pub min_ledge_grab_space: Cuboid,
     pub climb_wall_distance: f32,
+    pub climb_pull_up_height: f32,
 }
 
 impl Default for CharacterController {
@@ -213,6 +214,7 @@ impl Default for CharacterController {
             mantle_speed: 1.0,
             min_ledge_grab_space: Cuboid::new(0.2, 0.1, 0.2),
             climb_wall_distance: 0.5,
+            climb_pull_up_height: 0.2,
         }
     }
 }
@@ -330,6 +332,14 @@ impl CharacterControllerState {
         } else {
             &self.standing_collider
         }
+    }
+
+    pub fn pos_to_head_dist(&self) -> f32 {
+        self.collider().shape_scaled().compute_local_aabb().maxs.y
+    }
+
+    pub fn pos_to_feet_dist(&self) -> f32 {
+        self.collider().shape_scaled().compute_local_aabb().mins.y
     }
 
     pub fn radius(&self) -> f32 {
