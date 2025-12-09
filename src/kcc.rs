@@ -25,7 +25,7 @@ struct Ctx {
     transform: Write<Transform>,
     input: Write<AccumulatedInput>,
     cfg: Read<CharacterController>,
-    water_level: Read<WaterState>,
+    water: Read<WaterState>,
     cam: Option<Read<CharacterControllerCamera>>,
 }
 
@@ -63,8 +63,10 @@ fn run_kcc(
 
         handle_crouching(&move_and_slide, &mut ctx);
 
-        // here we'd handle things like spectator, dead, noclip, etc.
-        start_gravity(&time, &mut ctx);
+        if ctx.water.level < WaterLevel::Waist {
+            // here we'd handle things like spectator, dead, noclip, etc.
+            start_gravity(&time, &mut ctx);
+        }
 
         ctx.state.orientation = ctx
             .cam
@@ -91,7 +93,9 @@ fn run_kcc(
 
             validate_velocity(&mut ctx);
 
-            if ctx.state.grounded.is_some() {
+            if ctx.water.level > WaterLevel::Feet {
+                water_move(wish_velocity, &time, &move_and_slide, &mut ctx);
+            } else if ctx.state.grounded.is_some() {
                 ground_move(wish_velocity, &time, &move_and_slide, &mut ctx);
             } else {
                 air_move(wish_velocity, &time, &move_and_slide, &mut ctx);
@@ -202,6 +206,16 @@ fn air_accelerate(wish_velocity: Vec3, acceleration_hz: f32, time: &Time, ctx: &
     let accel_speed = f32::min(accel_speed, add_speed);
 
     ctx.velocity.0 += accel_speed * wish_dir;
+}
+
+fn water_move(wish_velocity: Vec3, time: &Time, move_and_slide: &MoveAndSlide, ctx: &mut CtxItem) {
+    let wish_velocity = wish_velocity;
+    air_accelerate(wish_velocity, ctx.cfg.water_acceleration_hz, time, ctx);
+    ctx.velocity.0 += ctx.state.base_velocity;
+
+    step_move(time, move_and_slide, ctx);
+
+    ctx.velocity.0 -= ctx.state.base_velocity;
 }
 
 fn step_move(time: &Time, move_and_slide: &MoveAndSlide, ctx: &mut CtxItem) {
@@ -808,6 +822,10 @@ fn update_grounded(
     time: &Time,
     ctx: &mut CtxItem,
 ) {
+    if ctx.water.level > WaterLevel::Feet {
+        set_grounded(None, colliders, time, ctx);
+        return;
+    }
     // TODO: reset surface friction here for some reason? something something water
 
     let y_vel = ctx.velocity.y;
