@@ -206,7 +206,7 @@ impl Default for CharacterController {
             jump_input_buffer: Duration::from_millis(150),
             jump_crane_chain_time: Duration::from_millis(140),
             crane_input_buffer: Duration::from_millis(200),
-            mantle_input_buffer: Duration::from_millis(150),
+            mantle_input_buffer: Duration::from_millis(50),
             crane_height: 1.5,
             mantle_height: 1.0,
             crane_speed: 11.0,
