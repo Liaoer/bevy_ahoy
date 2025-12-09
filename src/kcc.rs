@@ -360,7 +360,7 @@ fn handle_mantle_movement(
     move_and_slide: &MoveAndSlide,
     ctx: &mut CtxItem,
 ) {
-    let Some((wall_normal, mantle_height)) = ctx.state.mantle_height_left else {
+    let Some((_, mantle_height)) = ctx.state.mantle_height_left else {
         return;
     };
 
@@ -368,6 +368,13 @@ fn handle_mantle_movement(
         // Standing still
         return;
     };
+    let Some((_wall_point, wall_normal)) =
+        closest_wall_normal(ctx.cfg.move_and_slide.skin_width * 2.0, move_and_slide, ctx)
+    else {
+        ctx.state.mantle_height_left = None;
+        return;
+    };
+    ctx.state.mantle_height_left.unwrap().0 = wall_normal;
 
     let climb_dir = Vec3::Y;
     // positive when looking at the wall or above it, negative when looking down
