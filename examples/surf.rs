@@ -181,16 +181,12 @@ impl PlayerInput {
                 ),
                 (
                     Action::<YankCamera>::new(),
-                    Bindings::spawn((
-                        Spawn(Binding::from(MouseButton::Right)),
-                    )),
+                    bindings![MouseButton::Right]
                 ),
                 (
                     Action::<YankCamera>::new(),
                     Scale::splat(-1.0),
-                    Bindings::spawn((
-                        Spawn(Binding::from(MouseButton::Left)),
-                    )),
+                    bindings![MouseButton::Left],
                 ),
                 (
                     Action::<RotateCamera>::new(),
