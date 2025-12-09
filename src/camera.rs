@@ -147,9 +147,9 @@ fn rotate_camera(
 fn yank_camera(
     trigger: On<Fire<YankCamera>>,
     cameras: Query<&CharacterControllerCamera>,
-    mut transforms: Query<&mut Transform>,
     camera_ofs: Query<&CharacterControllerCameraOf>,
     time: Res<Time>,
+    mut transforms: Query<&mut Transform>,
 ) {
     let Ok(camera) = cameras.get(trigger.context) else {
         return;
