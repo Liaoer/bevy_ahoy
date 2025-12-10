@@ -1099,7 +1099,11 @@ fn handle_ledge_jump_dir(ctx: &mut CtxItem) -> Option<Vec3> {
     }
     let fwd = ctx.state.orientation.forward();
     let flat_fwd = Dir3::new(vec3(fwd.x, 0.0, fwd.z)).ok()?;
-    let tac_dir = Dir3::new(Vec3::Y * ctx.cfg.ledge_jump_factor + *flat_fwd).ok()?;
+    let tac_dir = if ctx.input.last_movement.unwrap_or_default().y >= 0.0 {
+        Dir3::new(Vec3::Y * ctx.cfg.ledge_jump_factor + *flat_fwd).ok()?
+    } else {
+        Dir3::NEG_Y
+    };
     ctx.state.mantle_progress = None;
     Some(tac_dir * ctx.cfg.ledge_jump_power)
 }
