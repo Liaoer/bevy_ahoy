@@ -1,5 +1,9 @@
 # Bevy Ahoy!
 
+[![crates.io](https://img.shields.io/crates/v/bevy_ahoy)](https://crates.io/crates/bevy_ahoy)
+[![docs.rs](https://docs.rs/bevy_ahoy/badge.svg)](https://docs.rs/bevy_ahoy)
+
+
 > [!IMPORTANT]  
 > Bevy Ahoy makes use of an unreleased avian version.
 >
@@ -8,9 +12,6 @@
 > [patch.crates-io]
 > avian3d = { git = "https://github.com/avianphysics/avian" }
 > ```
-
-[![crates.io](https://img.shields.io/crates/v/bevy_ahoy)](https://crates.io/crates/bevy_ahoy)
-[![docs.rs](https://docs.rs/bevy_ahoy/badge.svg)](https://docs.rs/bevy_ahoy)
 
 A fun 3D Kinematic Character Controller for [Bevy](https://github.com/bevyengine/bevy) + [Avian](https://github.com/avianphysics/avian) + [BEI](https://github.com/simgine/bevy_enhanced_input).
 
