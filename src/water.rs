@@ -38,21 +38,24 @@ fn update_water(
         water_state.level = WaterLevel::None;
         water_state.speed = f32::MAX;
         let waist = **object_position;
-        for contact_pair in collisions.collisions_with(object) {
-            if let Ok((collider, position, rotation, water)) = waters
-                .get(contact_pair.collider1)
-                .or(waters.get(contact_pair.collider2))
-            {
-                water_state.speed = water_state.speed.min(water.speed);
-                let level = if collider.contains_point(*position, *rotation, waist) {
-                    WaterLevel::Center
-                } else {
-                    WaterLevel::Touching
-                };
-                if level > water_state.level {
-                    water_state.level = level;
-                }
-            }
+        for (collider, position, rotation, water) in
+            collisions
+                .collisions_with(object)
+                .filter_map(|contact_pair| {
+                    waters
+                        .get(contact_pair.collider1)
+                        .or(waters.get(contact_pair.collider2))
+                        .ok()
+                })
+        {
+            let level = if collider.contains_point(*position, *rotation, waist) {
+                WaterLevel::Center
+            } else {
+                WaterLevel::Touching
+            };
+
+            water_state.level = level.max(water_state.level);
+            water_state.speed = water_state.speed.min(water.speed);
         }
     }
 }
