@@ -486,7 +486,7 @@ fn calc_climb_factor(ctx: &CtxItem) -> f32 {
     // positive when looking at the wall or above it, negative when looking down
     let movement = ctx.input.last_movement.unwrap_or_default().y;
     let cos = (ctx.state.orientation.forward() * movement.abs()).y;
-    let factor = ((cos + 0.5) * 2.5).clamp(-1.0, 1.0);
+    let factor = ((cos + ctx.cfg.climb_reverse_sin) * ctx.cfg.climb_sensitivity).clamp(-1.0, 1.0);
     if movement < 0.0 { -factor } else { factor }
 }
 
