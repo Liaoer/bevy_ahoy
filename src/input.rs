@@ -1,8 +1,8 @@
 use avian_pickup::input::{AvianPickupAction, AvianPickupInput};
 use bevy_time::Stopwatch;
 
-use crate::prelude::*;
 use crate::CharacterControllerState;
+use crate::prelude::*;
 
 use crate::fixed_update_utils::did_fixed_timestep_run_this_frame;
 
