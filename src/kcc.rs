@@ -1253,21 +1253,20 @@ fn is_intersecting(move_and_slide: &MoveAndSlide, waters: &Query<Entity>, ctx: &
     intersecting
 }
 
+// TODO: this should rotate the KCC, not the cams. The cams can then inherit that rotation inside the camera controller module.
 fn spin_cams(
     kccs: Query<Ctx>,
     mut cams: Query<&mut Transform, Without<CharacterController>>,
     time: Res<Time>,
 ) {
     for ctx in &kccs {
-        if ctx.state.grounded.is_some() {
-            ctx.cam
-                .and_then(|cam| cams.get_mut(cam.get()).ok())
-                .map(|mut cam: Mut<Transform>| {
-                    cam.rotate_axis(
-                        Dir3::Y,
-                        ctx.state.base_angular_velocity.y * time.delta_secs(),
-                    )
-                });
+        if ctx.state.grounded.is_some()
+            && let Some(mut cam) = ctx.cam.and_then(|cam| cams.get_mut(cam.get()).ok())
+        {
+            cam.rotate_axis(
+                Dir3::Y,
+                ctx.state.base_angular_velocity.y * time.delta_secs(),
+            );
         }
     }
 }
