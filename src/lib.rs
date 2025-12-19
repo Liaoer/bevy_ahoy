@@ -186,7 +186,7 @@ impl Default for CharacterController {
             filter: SpatialQueryFilter::default(),
             standing_view_height: 1.7,
             crouch_view_height: 1.2,
-            jump_crouch_view_height: 1.2,
+            jump_crouch_view_height: 1.45,
             ground_distance: 0.05,
             min_walk_cos: 40.0_f32.to_radians().cos(),
             stop_speed: 2.54,
