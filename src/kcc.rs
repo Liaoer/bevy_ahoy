@@ -836,9 +836,22 @@ fn handle_climbdown(
     if cast_move(cast_dir * cast_len, move_and_slide, ctx).is_some() {
         return;
     };
+    let original_position = ctx.transform.translation;
     ctx.transform.translation += cast_dir * cast_len;
-    ctx.input.mantled = Some(Stopwatch::new());
-    update_mantle_state(-wish_velocity, time, move_and_slide, ctx);
+
+    let Some(mantle_height) = available_mantle_height(-wish_velocity, time, move_and_slide, ctx)
+    else {
+        ctx.transform.translation = original_position;
+        return;
+    };
+
+    ctx.input.craned = None;
+    ctx.input.mantled = None;
+    // Ensure we don't immediately jump on the surface if mantle and jump are bound to the same key
+    ctx.input.jumped = None;
+    ctx.input.climbdown = None;
+
+    ctx.state.mantle_progress = Some(mantle_height);
 }
 
 fn move_character(time: &Time, move_and_slide: &MoveAndSlide, ctx: &mut CtxItem) {
