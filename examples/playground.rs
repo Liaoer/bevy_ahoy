@@ -28,8 +28,8 @@ fn main() -> AppExit {
                 })
                 .set(WindowPlugin {
                     primary_window: Window {
-                        // #[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
-                        //present_mode: bevy::window::PresentMode::Mailbox,
+                        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
+                        present_mode: bevy::window::PresentMode::Mailbox,
                         ..default()
                     }
                     .into(),
