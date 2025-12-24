@@ -7,7 +7,7 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, CursorOptions},
 };
-use bevy_ahoy::{prelude::*, PickupHoldConfig, PickupPullConfig};
+use bevy_ahoy::{PickupHoldConfig, PickupPullConfig, prelude::*};
 use bevy_enhanced_input::prelude::{Press, *};
 use bevy_trenchbroom::prelude::*;
 use bevy_trenchbroom_avian::AvianPhysicsBackend;
@@ -28,8 +28,8 @@ fn main() -> AppExit {
                 })
                 .set(WindowPlugin {
                     primary_window: Window {
-                        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
-                        present_mode: bevy::window::PresentMode::Mailbox,
+                        // #[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
+                        //present_mode: bevy::window::PresentMode::Mailbox,
                         ..default()
                     }
                     .into(),
@@ -201,7 +201,7 @@ impl PlayerInput {
                 (
                     Action::<Crouch>::new(),
                     ActionSettings { consume_input: false, ..default() },
-                    bindings![KeyCode::ControlLeft, GamepadButton::LeftTrigger],
+                    bindings![KeyCode::ControlLeft, GamepadButton::LeftTrigger2],
                 ),
                 (
                     Action::<SwimUp>::new(),
@@ -231,8 +231,8 @@ impl PlayerInput {
                     ActionSettings { consume_input: false, ..default() },
 
                     Bindings::spawn((
-             Spawn((Binding::mouse_motion(), Scale::splat(0.07))),
-                    Axial::right_stick().with((Scale::splat(4.0), DeadZone::default())),
+                        Spawn((Binding::mouse_motion(), Scale::splat(0.07))),
+                        Axial::right_stick().with((Scale::splat(4.0),  DeadZone::default())),
                     ))
                 ),
             ]));

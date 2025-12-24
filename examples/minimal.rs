@@ -59,15 +59,15 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
                 ),
                 (
                     Action::<Crouch>::new(),
-                    bindings![KeyCode::ControlLeft, GamepadButton::LeftTrigger],
+                    bindings![KeyCode::ControlLeft, GamepadButton::LeftTrigger2],
                 ),
                 (
                     Action::<RotateCamera>::new(),
                     Bindings::spawn((
-                            // tweak mouse and right stick sensitivity
-                            // in Scale::splat values
-             Spawn((Binding::mouse_motion(), Scale::splat(0.07))),
-                    Axial::right_stick().with((Scale::splat(4.0), DeadZone::default())),
+                        // tweak mouse and right stick sensitivity
+                        // in Scale::splat values
+                        Spawn((Binding::mouse_motion(), Scale::splat(0.07))),
+                        Axial::right_stick().with((Scale::splat(4.0), DeadZone::default())),
                     ))
                 ),
             ]),
