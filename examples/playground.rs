@@ -7,7 +7,7 @@ use bevy::{
     prelude::*,
     window::{CursorGrabMode, CursorOptions},
 };
-use bevy_ahoy::{PickupHoldConfig, PickupPullConfig, prelude::*};
+use bevy_ahoy::{prelude::*, PickupHoldConfig, PickupPullConfig};
 use bevy_enhanced_input::prelude::{Press, *};
 use bevy_trenchbroom::prelude::*;
 use bevy_trenchbroom_avian::AvianPhysicsBackend;
@@ -229,10 +229,10 @@ impl PlayerInput {
                 (
                     Action::<RotateCamera>::new(),
                     ActionSettings { consume_input: false, ..default() },
-                    Scale::splat(0.05),
+
                     Bindings::spawn((
-                        Spawn(Binding::mouse_motion()),
-                        Axial::right_stick()
+             Spawn((Binding::mouse_motion(), Scale::splat(0.07))),
+                    Axial::right_stick().with((Scale::splat(4.0), DeadZone::default())),
                     ))
                 ),
             ]));

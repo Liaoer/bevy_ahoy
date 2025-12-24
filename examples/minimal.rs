@@ -63,11 +63,11 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
                 ),
                 (
                     Action::<RotateCamera>::new(),
-                    // Tweak the mouse sensitivity here
-                    Scale::splat(0.05),
                     Bindings::spawn((
-                        Spawn(Binding::mouse_motion()),
-                        Axial::right_stick()
+                            // tweak mouse and right stick sensitivity
+                            // in Scale::splat values
+             Spawn((Binding::mouse_motion(), Scale::splat(0.07))),
+                    Axial::right_stick().with((Scale::splat(4.0), DeadZone::default())),
                     ))
                 ),
             ]),
