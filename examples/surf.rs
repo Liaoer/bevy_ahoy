@@ -373,10 +373,9 @@ pub struct SaveCheckpoint;
 #[action_output(bool)]
 pub struct LoadCheckpoint;
 
-
 #[derive(Clone, Debug, Reflect, Default, Resource)]
 #[reflect(Resource, Clone, Debug)]
-struct Checkpoint{
+struct Checkpoint {
     transform: Transform,
     velocity: LinearVelocity,
     state: CharacterControllerState,
@@ -384,7 +383,7 @@ struct Checkpoint{
     time: Stopwatch,
 }
 
-impl Checkpoint{
+impl Checkpoint {
     pub fn new(
         transform: Transform,
         velocity: LinearVelocity,
@@ -404,7 +403,7 @@ impl Checkpoint{
 
 fn save_checkpoint(
     _trigger: On<Start<SaveCheckpoint>>,
-    mut cmd:Commands,
+    mut cmd: Commands,
     player: Single<(&Transform, &LinearVelocity, &CharacterControllerState), With<Player>>,
     camera: Single<&Transform, (With<Camera3d>, Without<Player>)>,
     time: Single<&TimeText>,
@@ -417,8 +416,7 @@ fn save_checkpoint(
         state.clone(),
         camera.rotation,
         (**time).clone(),
-    )
-    );
+    ));
     info!("Checkpoint saved!");
 }
 
