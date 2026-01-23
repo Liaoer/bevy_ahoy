@@ -27,6 +27,11 @@ pub mod prelude {
     };
 }
 
+pub use crate::{
+    camera::AhoyCameraPlugin, dynamics::AhoyDynamicPlugin,
+    fixed_update_utils::AhoyFixedUpdateUtilsPlugin, input::AhoyInputPlugin, kcc::AhoyKccPlugin,
+    pickup_glue::AhoyPickupGluePlugin, water::AhoyWaterPlugin,
+};
 use crate::{input::AccumulatedInput, prelude::*};
 use avian_pickup::AvianPickupPlugin;
 pub use avian_pickup::{
