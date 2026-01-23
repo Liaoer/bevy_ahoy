@@ -94,15 +94,15 @@ impl PluginGroup for AhoyPlugins {
             .add(AhoySchedulePlugin {
                 schedule: self.schedule,
             })
-            .add(camera::AhoyCameraPlugin)
-            .add(input::AhoyInputPlugin)
-            .add(kcc::AhoyKccPlugin {
+            .add(AhoyCameraPlugin)
+            .add(AhoyInputPlugin)
+            .add(AhoyKccPlugin {
                 schedule: self.schedule,
             })
-            .add(water::AhoyWaterPlugin)
-            .add(fixed_update_utils::AhoyFixedUpdateUtilsPlugin)
-            .add(pickup_glue::AhoyPickupGluePlugin)
-            .add(dynamics::AhoyDynamicPlugin {
+            .add(AhoyWaterPlugin)
+            .add(AhoyFixedUpdateUtilsPlugin)
+            .add(AhoyPickupGluePlugin)
+            .add(AhoyDynamicPlugin {
                 schedule: self.schedule,
             })
             .add(AvianPickupPlugin::default())
