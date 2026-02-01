@@ -99,8 +99,9 @@ fn update_debug_text(
                 .map(|n| format!("{} ({})", name.entity, n))
                 .unwrap_or(format!("{}", name.entity))
         });
+    let stable_ground = state.last_stable_ground;
     text.0 = format!(
-        "Speed: {speed:.3}\nHorizontal Speed: {horizontal_speed:.3}\nVelocity: [{:.3}, {:.3}, {:.3}]\nCamera Position: [{:.3}, {:.3}, {:.3}]\nCollider Aabb:\n  min:[{:.3}, {:.3}, {:.3}]\n  max:[{:.3}, {:.3}, {:.3}]\nReal Collisions: {:#?}\nCollisions: {:#?}\nGround: {:?}",
+        "Speed: {speed:.3}\nHorizontal Speed: {horizontal_speed:.3}\nVelocity: [{:.3}, {:.3}, {:.3}]\nCamera Position: [{:.3}, {:.3}, {:.3}]\nCollider Aabb:\n  min:[{:.3}, {:.3}, {:.3}]\n  max:[{:.3}, {:.3}, {:.3}]\nReal Collisions: {:#?}\nCollisions: {:#?}\nGround: {:?}\nLast Stable Ground: {:?}",
         velocity.x,
         velocity.y,
         velocity.z,
@@ -115,7 +116,8 @@ fn update_debug_text(
         aabb.max.z,
         real_collisions,
         collisions,
-        ground
+        ground,
+        stable_ground
     );
 }
 

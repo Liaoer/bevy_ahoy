@@ -1,4 +1,4 @@
-use avian3d::character_controller::move_and_slide::MoveHitData;
+use avian3d::{character_controller::move_and_slide::MoveHitData, math::Vector};
 use bevy_ecs::{
     intern::Interned,
     query::QueryData,
@@ -21,7 +21,14 @@ pub struct AhoyKccPlugin {
 impl Plugin for AhoyKccPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(self.schedule, run_kcc.in_set(AhoySystems::MoveCharacters))
-            .add_systems(Update, spin_character_look);
+            .add_systems(
+                Update,
+                (
+                    spin_character_look,
+                    calculate_stable_ground,
+                    apply_last_stable_ground.after(calculate_stable_ground),
+                ),
+            );
     }
 }
 
@@ -1365,6 +1372,37 @@ pub(crate) fn spin_character_look(
             Quat::from_rotation_y(state.platform_angular_velocity.y * time.delta_secs())
                 * look.to_quat(),
         );
+    }
+}
+
+pub(crate) fn calculate_stable_ground(
+    mut kccs: Query<(&Transform, &mut CharacterControllerState)>,
+) {
+    for (transform, mut state) in &mut kccs {
+        if let Some(ground) = state.grounded {
+            let up_diff = (Vector::Y.y - ground.normal1.y).abs();
+
+            // If we don't compare to EPSILON, Vec::y will *almost* always be 0.9...
+            if up_diff <= f32::EPSILON {
+                state.last_stable_ground.replace(transform.translation);
+            }
+        }
+    }
+}
+
+pub(crate) fn apply_last_stable_ground(
+    mut kccs: Query<(
+        &mut Transform,
+        &CharacterControllerState,
+        &CharacterController,
+    )>,
+) {
+    for (mut transform, state, controller) in &mut kccs {
+        if state.last_ground.elapsed() >= controller.max_fall_time
+            && let Some(last_stable_ground) = state.last_stable_ground
+        {
+            transform.translation = last_stable_ground;
+        }
     }
 }
 
