@@ -1393,12 +1393,17 @@ pub(crate) fn calculate_stable_ground(
 pub(crate) fn apply_last_stable_ground(
     mut kccs: Query<(
         &mut Transform,
+        &WaterState,
         &CharacterControllerState,
         &CharacterController,
     )>,
 ) {
-    for (mut transform, state, controller) in &mut kccs {
-        if state.last_ground.elapsed() >= controller.max_fall_time
+    for (mut transform, water_state, state, controller) in &mut kccs {
+        let not_in_water = water_state.level == WaterLevel::None;
+        let max_fall_time_elapsed = state.last_ground.elapsed() >= controller.max_fall_time;
+
+        if not_in_water
+            && max_fall_time_elapsed
             && let Some(last_stable_ground) = state.last_stable_ground
         {
             transform.translation = last_stable_ground;
