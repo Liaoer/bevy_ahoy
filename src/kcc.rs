@@ -5,7 +5,6 @@ use bevy_ecs::{
     schedule::ScheduleLabel,
     system::lifetimeless::{Read, Write},
 };
-use bevy_time::common_conditions::on_timer;
 use core::fmt::Debug;
 use core::time::Duration;
 use tracing::warn;
@@ -22,14 +21,7 @@ pub struct AhoyKccPlugin {
 impl Plugin for AhoyKccPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(self.schedule, run_kcc.in_set(AhoySystems::MoveCharacters))
-            .add_systems(
-                Update,
-                (
-                    spin_character_look,
-                    calculate_stable_ground.run_if(on_timer(Duration::from_secs_f32(0.5))),
-                    apply_last_stable_ground.after(calculate_stable_ground),
-                ),
-            );
+            .add_systems(Update, (spin_character_look,));
     }
 }
 
@@ -1373,57 +1365,6 @@ pub(crate) fn spin_character_look(
             Quat::from_rotation_y(state.platform_angular_velocity.y * time.delta_secs())
                 * look.to_quat(),
         );
-    }
-}
-
-pub(crate) fn calculate_stable_ground(
-    mut kccs: Query<(&Transform, &mut CharacterControllerState)>,
-) {
-    for (transform, mut state) in &mut kccs {
-        let Some(ground) = state.grounded else {
-            continue;
-        };
-
-        let up_diff = (1. - ground.normal1.y).abs();
-
-        // If we don't compare to EPSILON, Vec3::y will *almost* always be 0.9...
-        if up_diff <= f32::EPSILON {
-            state.stable_grounds.push_front(transform.translation);
-
-            // Used to ensure that player doesn't get stuck in infinite loop if the most recent
-            // stable ground wasn't so stable.
-            while state.stable_grounds.len() > 5 {
-                state.stable_grounds.pop_back();
-            }
-        }
-    }
-}
-
-pub(crate) fn apply_last_stable_ground(
-    mut kccs: Query<(
-        &mut Transform,
-        &LinearVelocity,
-        &mut CharacterControllerState,
-        &CharacterController,
-    )>,
-    time: Res<Time>,
-) {
-    for (mut transform, velocity, mut state, controller) in &mut kccs {
-        let speed_diff = 1. - (velocity.0.y.abs() / controller.max_speed);
-
-        // Terminal velocity will take quite a while to reach exactly 100., so we compare to 0.01
-        // to ensure that it doesn't take longer than expected
-        if speed_diff <= 0.01 {
-            state.terminal.tick(time.elapsed());
-        } else {
-            state.terminal.reset();
-        }
-
-        let max_fall_elapsed = state.terminal.elapsed() >= controller.max_fall_time;
-
-        if max_fall_elapsed && let Some(last_stable_ground) = state.stable_grounds.pop_front() {
-            transform.translation = last_stable_ground;
-        }
     }
 }
 

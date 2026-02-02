@@ -1,4 +1,4 @@
-use crate::util::ExampleUtilPlugin;
+use crate::util::{ExampleUtilPlugin, StableGround};
 use avian3d::prelude::*;
 use bevy::{
     color::palettes::tailwind,
@@ -126,7 +126,8 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
         [CollisionLayer::Player],
         LayerMask::ALL,
     ),
-    CheckpointHistory
+    CheckpointHistory,
+    StableGround::default(),
 )]
 struct Player;
 

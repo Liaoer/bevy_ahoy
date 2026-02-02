@@ -53,7 +53,7 @@ use bevy_ecs::{
 };
 use bevy_time::Stopwatch;
 use core::time::Duration;
-use std::{collections::VecDeque, sync::Arc};
+use std::sync::Arc;
 
 pub mod camera;
 mod dynamics;
@@ -172,7 +172,6 @@ pub struct CharacterController {
     pub crouch_speed_scale: f32,
     pub speed: f32,
     pub air_speed: f32,
-    pub max_fall_time: Duration,
     pub move_and_slide: MoveAndSlideConfig,
     pub max_speed: f32,
     pub jump_height: f32,
@@ -227,7 +226,6 @@ impl Default for CharacterController {
             crouch_speed_scale: 1.0 / 3.0,
             speed: 12.0,
             air_speed: 1.5,
-            max_fall_time: Duration::from_secs(5),
             move_and_slide: MoveAndSlideConfig {
                 skin_width: 0.015,
                 ..default()
@@ -389,10 +387,8 @@ pub struct CharacterControllerState {
     /// jumped off of).
     pub platform_angular_velocity: Vec3,
     pub grounded: Option<MoveHitData>,
-    pub stable_grounds: VecDeque<Vec3>,
     pub crouching: bool,
     pub tac_velocity: f32,
-    pub terminal: Stopwatch,
     pub last_ground: Stopwatch,
     pub last_tac: Stopwatch,
     pub last_step_up: Stopwatch,
@@ -411,10 +407,8 @@ impl Default for CharacterControllerState {
             platform_angular_velocity: Vec3::ZERO,
             orientation: Quat::IDENTITY,
             grounded: None,
-            stable_grounds: VecDeque::default(),
             crouching: false,
             tac_velocity: 0.0,
-            terminal: max_stopwatch(),
             last_ground: max_stopwatch(),
             last_tac: max_stopwatch(),
             last_step_up: max_stopwatch(),
