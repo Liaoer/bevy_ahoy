@@ -13,7 +13,7 @@ use bevy_trenchbroom::prelude::*;
 use bevy_trenchbroom_avian::AvianPhysicsBackend;
 use core::ops::Deref;
 
-use crate::util::ExampleUtilPlugin;
+use crate::util::{ExampleUtilPlugin, StableGround};
 use std::time::Duration;
 
 mod util;
@@ -121,6 +121,7 @@ fn spawn_player(
             RigidBody::Kinematic,
             Collider::cylinder(0.7, 1.8),
             Mass(90.0),
+            StableGround::default(),
         ))
         .id();
     commands.entity(camera.into_inner()).insert((

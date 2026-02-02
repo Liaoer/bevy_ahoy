@@ -21,7 +21,7 @@ pub struct AhoyKccPlugin {
 impl Plugin for AhoyKccPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(self.schedule, run_kcc.in_set(AhoySystems::MoveCharacters))
-            .add_systems(Update, spin_character_look);
+            .add_systems(Update, (spin_character_look,));
     }
 }
 

@@ -7,7 +7,7 @@ use bevy::{
 use bevy_ahoy::prelude::*;
 use bevy_enhanced_input::prelude::*;
 
-use crate::util::ExampleUtilPlugin;
+use crate::util::{ExampleUtilPlugin, StableGround};
 
 mod util;
 
@@ -41,6 +41,7 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
             // The KCC currently behaves best when using a cylinder
             Collider::cylinder(0.7, 1.8),
             Transform::from_xyz(0.0, 20.0, 0.0),
+            StableGround::default(),
             // Configure inputs. The actions `Movement`, `Jump`, etc. are provided by Ahoy, you just need to bind them.
             PlayerInput,
             actions!(PlayerInput[
