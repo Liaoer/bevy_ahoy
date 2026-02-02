@@ -1422,8 +1422,6 @@ pub(crate) fn apply_last_stable_ground(
         let max_fall_elapsed = state.terminal.elapsed() >= controller.max_fall_time;
 
         if max_fall_elapsed && let Some(last_stable_ground) = state.last_stable_ground.pop_front() {
-            // Vector::Y * 0.2 prevents character controller from clipping into the ground. Useful
-            // for walking off ledges as they may be pushed off when they teleport back.
             transform.translation = last_stable_ground;
         }
     }
