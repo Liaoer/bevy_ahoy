@@ -10,7 +10,6 @@ use bevy::{
 use bevy_ahoy::{PickupHoldConfig, PickupPullConfig, prelude::*};
 use bevy_enhanced_input::prelude::{Press, *};
 use bevy_trenchbroom::prelude::*;
-use bevy_trenchbroom_avian::AvianPhysicsBackend;
 use core::ops::Deref;
 
 use crate::util::{ExampleUtilPlugin, StableGround};
@@ -57,7 +56,6 @@ fn main() -> AppExit {
                         .smooth_by_default_angle()
                 }),
             ),
-            TrenchBroomPhysicsPlugin::new(AvianPhysicsBackend),
             ExampleUtilPlugin,
         ))
         .add_input_context::<PlayerInput>()
@@ -79,7 +77,7 @@ fn main() -> AppExit {
 }
 
 fn setup(mut commands: Commands, assets: Res<AssetServer>) {
-    commands.spawn(SceneRoot(assets.load("maps/playground.map#Scene")));
+    commands.spawn(WorldAssetRoot(assets.load("maps/playground.map#Scene")));
     commands.spawn(Camera3d::default());
 }
 
@@ -273,7 +271,7 @@ fn on_add_prop<T: QuakeClass + Deref<Target = bool>>(mut world: DeferredWorld, c
     let dynamic = *world.get::<T>(ctx.entity).unwrap().deref();
     let assets = world.resource::<AssetServer>().clone();
     world.commands().entity(ctx.entity).insert((
-        SceneRoot(
+        WorldAssetRoot(
             assets.load(GltfAssetLabel::Scene(0).from_asset(T::CLASS_INFO.model_path().unwrap())),
         ),
         ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh)

@@ -6,6 +6,7 @@ use bevy::{
     gltf::{GltfPlugin, convert_coordinates::GltfConvertCoordinates},
     image::{ImageAddressMode, ImageSamplerDescriptor},
     input::common_conditions::input_just_pressed,
+    platform::collections::HashSet,
     prelude::*,
     window::{CursorGrabMode, CursorOptions, WindowResolution},
 };
@@ -13,7 +14,6 @@ use bevy_ahoy::prelude::*;
 use bevy_enhanced_input::prelude::*;
 use bevy_time::Stopwatch;
 use bevy_trenchbroom::prelude::*;
-use bevy_trenchbroom_avian::AvianPhysicsBackend;
 
 mod util;
 
@@ -71,10 +71,9 @@ fn main() -> AppExit {
                         ]
                         .into_iter()
                         .map(String::from)
-                        .collect::<std::collections::HashSet<_>>(),
+                        .collect::<HashSet<_>>(),
                     ),
             ),
-            TrenchBroomPhysicsPlugin::new(AvianPhysicsBackend),
             ExampleUtilPlugin,
             CheckpointPlugin,
         ))
@@ -97,7 +96,7 @@ fn main() -> AppExit {
 }
 
 fn setup(mut commands: Commands, assets: Res<AssetServer>) {
-    commands.spawn(SceneRoot(assets.load("maps/utopia.map#Scene")));
+    commands.spawn(WorldAssetRoot(assets.load("maps/utopia.map#Scene")));
     commands.spawn(Camera3d::default());
 }
 
