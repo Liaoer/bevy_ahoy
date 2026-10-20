@@ -6,17 +6,17 @@ use bevy::{
     gltf::{GltfPlugin, convert_coordinates::GltfConvertCoordinates},
     image::{ImageAddressMode, ImageSamplerDescriptor},
     input::common_conditions::input_just_pressed,
+    platform::collections::HashSet,
     prelude::*,
-    scene::SceneInstanceReady,
     window::{CursorGrabMode, CursorOptions, WindowResolution},
+    world_serialization::WorldInstanceReady,
 };
 use bevy_ahoy::{CharacterLook, prelude::*};
-use bevy_enhanced_input::prelude::*;
+use bevy_enhanced_input::prelude::{Press, *};
 use bevy_third_person_camera::*;
 use bevy_trenchbroom::prelude::*;
-use bevy_trenchbroom_avian::AvianPhysicsBackend;
 use core::ops::Deref;
-use std::time::Duration;
+use std::{f32::consts::PI, time::Duration};
 
 mod util;
 
@@ -71,10 +71,9 @@ fn main() -> AppExit {
                         ]
                         .into_iter()
                         .map(String::from)
-                        .collect::<std::collections::HashSet<_>>(),
+                        .collect::<HashSet<_>>(),
                     ),
             ),
-            TrenchBroomPhysicsPlugin::new(AvianPhysicsBackend),
             PhysicsPlugins::default(),
             EnhancedInputPlugin,
             AhoyPlugins::default(),
@@ -91,6 +90,7 @@ fn main() -> AppExit {
                 .in_set(AhoySystems::MoveCharacters),
         )
         .add_observer(spawn_player)
+        .add_observer(face_dash_direction)
         .add_systems(
             Update,
             (
@@ -103,7 +103,7 @@ fn main() -> AppExit {
 
 fn setup(mut commands: Commands, assets: Res<AssetServer>) {
     commands.insert_resource(PlayerModel(assets.load("models/ual.glb")));
-    commands.spawn(SceneRoot(assets.load("maps/playground.map#Scene")));
+    commands.spawn(WorldAssetRoot(assets.load("maps/playground.map#Scene")));
     commands.spawn((
         Camera3d::default(),
         ThirdPersonCamera {
@@ -177,7 +177,7 @@ fn spawn_player(
             .with_children(|parent| {
                 parent
                     .spawn((
-                        SceneRoot(gltf.scenes[0].clone()),
+                        WorldAssetRoot(gltf.scenes[0].clone()),
                         Transform::from_xyz(0.0, -1.0, 0.0),
                     ))
                     .observe(prepare_animations);
@@ -221,6 +221,11 @@ impl PlayerInput {
                 (
                     Action::<Crouch>::new(),
                     bindings![KeyCode::ControlLeft, GamepadButton::LeftTrigger2],
+                ),
+                (
+                    Action::<Dash>::new(),
+                    Press::default(),
+                    bindings![KeyCode::AltLeft, GamepadButton::East],
                 ),
             ]));
     }
@@ -268,7 +273,7 @@ fn on_add_prop<T: QuakeClass + Deref<Target = bool>>(mut world: DeferredWorld, c
     let dynamic = *world.get::<T>(ctx.entity).unwrap().deref();
     let assets = world.resource::<AssetServer>().clone();
     world.commands().entity(ctx.entity).insert((
-        SceneRoot(
+        WorldAssetRoot(
             assets.load(GltfAssetLabel::Scene(0).from_asset(T::CLASS_INFO.model_path().unwrap())),
         ),
         ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh)
@@ -383,11 +388,32 @@ fn rotate_player(
     }
 }
 
+fn face_dash_direction(
+    _: On<Start<Dash>>,
+    movement: Single<&Action<Movement>>,
+    camera: Single<&Transform, With<Camera3d>>,
+    mut player_q: Query<(&mut Transform, &mut CharacterLook), (With<Player>, Without<Camera3d>)>,
+) {
+    let movement = *movement.into_inner();
+    let input_dir = camera.movement_direction(*movement);
+
+    for (mut pos, mut look) in player_q.iter_mut() {
+        if input_dir != Vec3::ZERO {
+            // Snap instead of slerp so the roll faces where we dash
+            pos.rotation = Quat::from_rotation_y(input_dir.x.atan2(input_dir.z));
+        } else {
+            // Without input the KCC dashes along the look, so aim it where the model (+Z) faces
+            let (yaw, _, _) = pos.rotation.to_euler(EulerRot::YXZ);
+            look.yaw = yaw + PI;
+        }
+    }
+}
+
 // ANIMATION
 
 /// Build animation graph when scene loads
 fn prepare_animations(
-    _: On<SceneInstanceReady>,
+    _: On<WorldInstanceReady>,
     gltfs: Res<Assets<Gltf>>,
     children_q: Query<&Children>,
     player_model: Res<PlayerModel>,
@@ -415,6 +441,7 @@ fn prepare_animations(
             gltf.named_animations["Jump_Loop"].clone(),
             gltf.named_animations["Crouch_Fwd_Loop"].clone(),
             gltf.named_animations["Crouch_Idle_Loop"].clone(),
+            gltf.named_animations["Roll"].clone(),
         ];
 
         let (graph, nodes) = AnimationGraph::from_clips(clips);
@@ -460,6 +487,11 @@ fn calcucate_animations(
         let grounded = ahoy_state.grounded.is_some();
         let moving = horizontal_speed > IDLE_ANIMATION_THRESHOLD;
 
+        if ahoy_state.dash.progress.is_some() {
+            animation.request(AnimationState::Dash);
+            continue;
+        }
+
         // in the air animation
         if !grounded {
             if !animation.current.is_jumping() {
@@ -498,6 +530,8 @@ fn calcucate_animations(
     }
 }
 
+const ROLL_SPEED: f32 = 3.0;
+
 fn animate(
     mut players: Query<&mut Player>,
     mut animation_players: Query<&mut AnimationPlayer>,
@@ -513,28 +547,42 @@ fn animate(
             continue;
         };
 
+        // Let the roll play out before switching to anything else
+        if ani.current == AnimationState::Dash
+            && animation_player
+                .animation(ani.nodes[ani.current.clip_index()])
+                .is_some_and(|a| !a.is_finished())
+        {
+            ani.requested = None;
+            continue;
+        }
+
         if let Some(next) = ani.requested.take() {
             let node = ani.nodes[next.clip_index()];
 
-            let duration = if next.is_jumping() { 0.1 } else { 0.3 };
+            let duration = if next.is_jumping() || next == AnimationState::Dash {
+                0.1
+            } else {
+                0.3
+            };
 
-            transitions
-                .play(
-                    &mut animation_player,
-                    node,
-                    Duration::from_secs_f32(duration),
-                )
-                .repeat();
-
-            let current_node = ani.nodes[ani.current.clip_index()];
-            if let Some(active) = animation_player.animation_mut(current_node) {
-                match ani.current {
-                    AnimationState::Run(s) | AnimationState::Crouch(s) => {
-                        active.set_speed(s.clamp(0.0, 2.0))
-                    }
-                    _ => active.set_speed(1.0),
-                };
+            let active = transitions.play(
+                &mut animation_player,
+                node,
+                Duration::from_secs_f32(duration),
+            );
+            if next != AnimationState::Dash {
+                active.repeat();
             }
+
+            match next {
+                AnimationState::Run(s) | AnimationState::Crouch(s) => {
+                    active.set_speed(s.clamp(0.0, 2.0))
+                }
+                // Roll is way longer than a dash
+                AnimationState::Dash => active.set_speed(ROLL_SPEED),
+                _ => active.set_speed(1.0),
+            };
 
             ani.current = next;
         }
@@ -584,6 +632,7 @@ pub enum AnimationState {
     Jump,
     Crouch(f32),
     CrouchIdle,
+    Dash,
 }
 impl AnimationState {
     pub fn clip_index(&self) -> usize {
@@ -593,6 +642,7 @@ impl AnimationState {
             AnimationState::Jump => 2,
             AnimationState::Crouch(_) => 3,
             AnimationState::CrouchIdle => 4,
+            AnimationState::Dash => 5,
         }
     }
     fn is_jumping(&self) -> bool {

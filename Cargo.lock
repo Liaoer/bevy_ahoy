@@ -1800,7 +1800,7 @@ dependencies = [
 [[package]]
 name = "bevy_third_person_camera"
 version = "0.4.0"
-source = "git+https://github.com/olekspickle/bevy_third_person_camera#c4c0eb7a8dc638209c732a75cd87728540a18512"
+source = "git+https://github.com/olekspickle/bevy_third_person_camera?rev=9640960#96409609dd2ebb1ce94c257ab3a33f2221dd3c6a"
 dependencies = [
  "avian3d",
  "bevy",

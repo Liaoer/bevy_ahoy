@@ -19,8 +19,8 @@ pub mod prelude {
         AhoyPlugins, AhoySystems, CharacterController, CharacterControllerState,
         camera::{CharacterControllerCamera, CharacterControllerCameraOf},
         input::{
-            Climbdown, Crane, Crouch, GlobalMovement, Jump, Mantle, Movement, RotateCamera, SwimUp,
-            Tac, YankCamera,
+            Climbdown, Crane, Crouch, Dash, GlobalMovement, Jump, Mantle, Movement, RotateCamera,
+            SwimUp, Tac, YankCamera,
         },
         water::{Water, WaterLevel, WaterState},
     };
@@ -216,6 +216,7 @@ pub struct CharacterController {
     pub max_ledge_grab_distance: f32,
     pub climb_reverse_sin: f32,
     pub climb_sensitivity: f32,
+    pub dash: DashConfig,
 }
 
 impl Default for CharacterController {
@@ -276,6 +277,38 @@ impl Default for CharacterController {
             max_ledge_grab_distance: 0.3,
             climb_reverse_sin: 40.0_f32.to_radians().sin(),
             climb_sensitivity: 2.5,
+            dash: DashConfig::default(),
+        }
+    }
+}
+
+#[derive(Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+pub struct DashConfig {
+    /// Distance covered by a dash that isn't blocked or cancelled.
+    pub distance: f32,
+    pub duration: Duration,
+    pub cooldown: Duration,
+    pub input_buffer: Duration,
+    /// Dashes allowed before touching the ground again.
+    pub max_air_dashes: u8,
+}
+
+impl DashConfig {
+    pub fn speed(&self) -> f32 {
+        self.distance / self.duration.as_secs_f32().max(f32::EPSILON)
+    }
+}
+
+impl Default for DashConfig {
+    fn default() -> Self {
+        Self {
+            distance: 8.0,
+            duration: Duration::from_millis(200),
+            cooldown: Duration::from_millis(600),
+            input_buffer: Duration::from_millis(150),
+            max_air_dashes: 1,
         }
     }
 }
@@ -347,6 +380,7 @@ pub struct CharacterControllerState {
     ///
     /// This is [`None`] if a mantle is not in progress.
     pub mantle: Option<MantleState>,
+    pub dash: DashState,
 }
 
 impl Default for CharacterControllerState {
@@ -364,6 +398,7 @@ impl Default for CharacterControllerState {
             last_step_down: max_stopwatch(),
             crane_height_left: None,
             mantle: None,
+            dash: DashState::default(),
         }
     }
 }
@@ -373,6 +408,33 @@ impl Default for CharacterControllerState {
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 pub struct MantleState {
     pub height_left: f32,
+}
+
+#[derive(Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+pub struct DashState {
+    /// [`None`] if a dash is not in progress.
+    pub progress: Option<DashProgress>,
+    pub last: Stopwatch,
+    pub air_dashes_used: u8,
+}
+
+impl Default for DashState {
+    fn default() -> Self {
+        Self {
+            progress: None,
+            last: max_stopwatch(),
+            air_dashes_used: 0,
+        }
+    }
+}
+
+/// The state of a dash in progress.
+#[derive(Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+pub struct DashProgress {
+    pub direction: Dir3,
+    pub time_left: Duration,
 }
 
 fn max_stopwatch() -> Stopwatch {

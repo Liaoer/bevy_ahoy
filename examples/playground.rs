@@ -196,6 +196,11 @@ impl PlayerInput {
                     bindings![KeyCode::ControlLeft, GamepadButton::LeftTrigger2],
                 ),
                 (
+                    Action::<Dash>::new(),
+                    Press::default(),
+                    bindings![KeyCode::AltLeft, GamepadButton::East],
+                ),
+                (
                     Action::<SwimUp>::new(),
                     bindings![KeyCode::Space, GamepadButton::South],
                 ),
