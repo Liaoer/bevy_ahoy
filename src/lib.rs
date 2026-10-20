@@ -17,7 +17,7 @@ pub mod prelude {
 
     pub use crate::{
         AhoyPlugins, AhoySystems, AirJumping, CharacterController, CharacterControllerState,
-        Dashing,
+        Dashing, WallRunning,
         camera::{CharacterControllerCamera, CharacterControllerCameraOf},
         input::{
             Climbdown, Crane, Crouch, Dash, GlobalMovement, Jump, Mantle, Movement, RotateCamera,
@@ -302,6 +302,40 @@ impl Default for AirJumping {
     }
 }
 
+/// Add alongside [`CharacterController`] to allow running along walls.
+#[derive(Component, Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[reflect(Component)]
+#[require(WallRunState)]
+pub struct WallRunning {
+    /// Horizontal speed along the wall needed to start and keep running.
+    pub min_speed: f32,
+    pub max_duration: Duration,
+    /// Fraction of gravity applied while running.
+    pub gravity_scale: f32,
+    pub detection_distance: f32,
+    /// Speed away from the wall when jumping off.
+    pub jump_push: f32,
+    pub jump_height: f32,
+    /// Time after leaving a wall before another run can start.
+    pub reattach_cooldown: Duration,
+}
+
+impl Default for WallRunning {
+    fn default() -> Self {
+        Self {
+            min_speed: 6.0,
+            max_duration: Duration::from_millis(1500),
+            gravity_scale: 0.15,
+            detection_distance: 0.3,
+            jump_push: 8.0,
+            jump_height: 1.5,
+            reattach_cooldown: Duration::from_millis(300),
+        }
+    }
+}
+
 /// Add alongside [`CharacterController`] to allow dashing.
 #[derive(Component, Clone, Reflect, PartialEq, Debug)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
@@ -458,6 +492,37 @@ impl Default for DashState {
             air_dashes_used: 0,
         }
     }
+}
+
+#[derive(Component, Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[reflect(Component)]
+pub struct WallRunState {
+    /// [`None`] if a wall run is not in progress.
+    pub progress: Option<WallRunProgress>,
+    /// Time since the last wall run ended.
+    pub last: Stopwatch,
+    /// Set when a run times out, so we don't immediately reattach. Cleared on landing or wall jump.
+    pub exhausted: bool,
+}
+
+impl Default for WallRunState {
+    fn default() -> Self {
+        Self {
+            progress: None,
+            last: max_stopwatch(),
+            exhausted: false,
+        }
+    }
+}
+
+/// The state of a wall run in progress.
+#[derive(Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+pub struct WallRunProgress {
+    pub normal: Dir3,
+    pub elapsed: Duration,
 }
 
 /// The state of a dash in progress.

@@ -18,7 +18,7 @@ use tracing::{error, warn};
 use crate::{
     AirJumpState, AirJumping, CharacterControllerDerivedProps, CharacterControllerOutput,
     CharacterControllerState, CharacterLook, DashProgress, DashState, Dashing, MantleOutput,
-    MantleState, input::AccumulatedInput, prelude::*,
+    MantleState, WallRunProgress, WallRunState, WallRunning, input::AccumulatedInput, prelude::*,
 };
 
 pub struct AhoyKccPlugin {
@@ -120,6 +120,8 @@ struct Ctx {
     dash: Option<Write<DashState>>,
     air_jump_cfg: Option<Read<AirJumping>>,
     air_jump: Option<Write<AirJumpState>>,
+    wall_run_cfg: Option<Read<WallRunning>>,
+    wall_run: Option<Write<WallRunState>>,
     colliders: Read<RigidBodyColliders>,
 }
 
@@ -189,6 +191,9 @@ fn run_kcc(
         if let Some(dash) = ctx.dash.as_mut() {
             dash.last.tick(time.delta());
         }
+        if let Some(wall_run) = ctx.wall_run.as_mut() {
+            wall_run.last.tick(time.delta());
+        }
 
         depenetrate_character(&move_and_slide, &mut ctx, &mut transform);
         update_grounded(&move_and_slide, &colliders, &time, &mut ctx, &mut transform);
@@ -222,6 +227,13 @@ fn run_kcc(
             &mut transform,
         );
         update_dash_state(wish_velocity, &mut ctx);
+        update_wall_run_state(
+            wish_velocity,
+            &time,
+            &move_and_slide,
+            &mut ctx,
+            &mut transform,
+        );
         if ctx.state.crane_height_left.is_some() {
             handle_crane_movement(
                 wish_velocity,
@@ -252,6 +264,14 @@ fn run_kcc(
                 wish_velocity,
                 &time,
                 &colliders,
+                &move_and_slide,
+                &mut ctx,
+                &mut transform,
+            );
+        } else if ctx.wall_run.as_ref().is_some_and(|w| w.progress.is_some()) {
+            handle_wall_run_movement(
+                wish_velocity,
+                &time,
                 &move_and_slide,
                 &mut ctx,
                 &mut transform,
@@ -330,6 +350,9 @@ fn run_kcc(
             }
             if let Some(air_jump) = ctx.air_jump.as_mut() {
                 air_jump.used = 0;
+            }
+            if let Some(wall_run) = ctx.wall_run.as_mut() {
+                wall_run.exhausted = false;
             }
         }
         // TODO: check_falling();
@@ -828,6 +851,123 @@ fn handle_dash_movement(
         let horizontal = ctx.velocity.0.with_y(0.0).clamp_length_max(ctx.cfg.speed);
         ctx.velocity.0 = horizontal.with_y(ctx.velocity.y);
     }
+}
+
+fn update_wall_run_state(
+    wish_velocity: Vec3,
+    time: &Time,
+    move_and_slide: &MoveAndSlide,
+    ctx: &mut CtxItem,
+    transform: &mut Transform,
+) {
+    let Some(cfg) = ctx.wall_run_cfg else {
+        return;
+    };
+    let can_run = ctx.state.grounded.is_none()
+        && ctx.state.crane_height_left.is_none()
+        && ctx.state.mantle.is_none()
+        && ctx.water.level <= WaterLevel::Feet
+        && !ctx.dash.as_ref().is_some_and(|d| d.progress.is_some())
+        && wish_velocity != Vec3::ZERO;
+    let horizontal_velocity = ctx.velocity.0.with_y(0.0);
+    let wall = can_run
+        .then(|| closest_wall_normal(cfg.detection_distance, move_and_slide, ctx, transform))
+        .flatten()
+        .map(|(_point, normal)| normal)
+        // Steep slopes aren't runnable walls
+        .filter(|normal| normal.y.abs() < 0.3)
+        .filter(|normal| {
+            let along_wall = horizontal_velocity - **normal * horizontal_velocity.dot(**normal);
+            along_wall.length() >= cfg.min_speed
+        });
+
+    let Some(wall_run) = ctx.wall_run.as_mut() else {
+        return;
+    };
+    match (wall_run.progress.as_mut(), wall) {
+        (Some(progress), Some(normal)) => {
+            progress.normal = normal;
+            progress.elapsed += time.delta();
+            if progress.elapsed > cfg.max_duration {
+                wall_run.progress = None;
+                wall_run.last.reset();
+                wall_run.exhausted = true;
+            }
+        }
+        (Some(_), None) => {
+            wall_run.progress = None;
+            wall_run.last.reset();
+        }
+        (None, Some(normal)) => {
+            if wall_run.exhausted
+                || wall_run.last.elapsed() < cfg.reattach_cooldown
+                || ctx.state.last_tac.elapsed() < cfg.reattach_cooldown
+            {
+                return;
+            }
+            wall_run.progress = Some(WallRunProgress {
+                normal,
+                elapsed: Duration::ZERO,
+            });
+            // Catch the fall so runs started on the way down still go somewhere
+            ctx.velocity.y = ctx.velocity.y.max(0.0);
+            // Every wall gives the air jumps back, which is what makes runs chain
+            if let Some(air_jump) = ctx.air_jump.as_mut() {
+                air_jump.used = 0;
+            }
+        }
+        (None, None) => {}
+    }
+}
+
+fn handle_wall_run_movement(
+    wish_velocity: Vec3,
+    time: &Time,
+    move_and_slide: &MoveAndSlide,
+    ctx: &mut CtxItem,
+    transform: &mut Transform,
+) {
+    let Some(cfg) = ctx.wall_run_cfg else {
+        return;
+    };
+    let Some(normal) = ctx
+        .wall_run
+        .as_ref()
+        .and_then(|w| w.progress.as_ref())
+        .map(|p| *p.normal)
+    else {
+        return;
+    };
+
+    if ctx
+        .input
+        .jumped
+        .as_ref()
+        .is_some_and(|j| j.elapsed() <= ctx.cfg.jump_input_buffer)
+    {
+        ctx.input.jumped = None;
+        ctx.input.tac = None;
+        if let Some(wall_run) = ctx.wall_run.as_mut() {
+            wall_run.progress = None;
+            wall_run.last.reset();
+            wall_run.exhausted = false;
+        }
+        let jump_speed = (2.0 * ctx.cfg.gravity * cfg.jump_height).sqrt();
+        ctx.velocity.0 = ctx.velocity.0.with_y(0.0) + normal * cfg.jump_push + Vec3::Y * jump_speed;
+        air_move(wish_velocity, time, move_and_slide, ctx, transform);
+        return;
+    }
+
+    // Slide along the wall plane and undo most of this tick's gravity
+    let into_wall = ctx.velocity.dot(normal);
+    ctx.velocity.0 -= normal * into_wall;
+    ctx.velocity.y += ctx.cfg.gravity * (1.0 - cfg.gravity_scale) * time.delta_secs();
+    let wish_along_wall = wish_velocity - normal * wish_velocity.dot(normal);
+    ground_accelerate(wish_along_wall, ctx.cfg.air_acceleration_hz, time, ctx);
+
+    ctx.velocity.0 += ctx.state.platform_velocity;
+    step_move(time, move_and_slide, ctx, transform);
+    ctx.velocity.0 -= ctx.state.platform_velocity;
 }
 
 fn calc_climb_factor(ctx: &CtxItem, wish_velocity: Vec3) -> f32 {

@@ -110,6 +110,7 @@ fn spawn_player(
             CharacterController::default(),
             Dashing::default(),
             AirJumping::default(),
+            WallRunning::default(),
             RigidBody::Kinematic,
             Collider::cylinder(0.7, 1.8),
             Mass(90.0),

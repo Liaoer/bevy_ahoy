@@ -11,7 +11,7 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, WindowResolution},
     world_serialization::WorldInstanceReady,
 };
-use bevy_ahoy::{CharacterLook, DashState, prelude::*};
+use bevy_ahoy::{CharacterLook, DashState, WallRunState, prelude::*};
 use bevy_enhanced_input::prelude::{Press, *};
 use bevy_third_person_camera::*;
 use bevy_trenchbroom::prelude::*;
@@ -130,6 +130,7 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
         count: 5,
         ..default()
     },
+    WallRunning,
     RigidBody::Kinematic,
     Collider::cylinder(0.7, 1.8),
     CollisionLayers::new(
@@ -476,6 +477,7 @@ fn calcucate_animations(
         &CharacterController,
         &CharacterControllerState,
         &DashState,
+        &WallRunState,
         &Transform,
         &mut PreviousPosition,
         &mut Player,
@@ -483,7 +485,7 @@ fn calcucate_animations(
 ) {
     const IDLE_ANIMATION_THRESHOLD: f32 = 0.1;
 
-    for (ahoy, ahoy_state, dash, pos, mut prev_pos, mut player) in players.iter_mut() {
+    for (ahoy, ahoy_state, dash, wall_run, pos, mut prev_pos, mut player) in players.iter_mut() {
         let animation = &mut player.animation;
 
         let displacement = pos.translation - prev_pos.0;
@@ -496,6 +498,11 @@ fn calcucate_animations(
 
         if dash.progress.is_some() {
             animation.request(AnimationState::Dash);
+            continue;
+        }
+
+        if wall_run.progress.is_some() {
+            animation.request(AnimationState::Run(ahoy.speed));
             continue;
         }
 
