@@ -11,7 +11,7 @@ use bevy::{
     window::{CursorGrabMode, CursorOptions, WindowResolution},
     world_serialization::WorldInstanceReady,
 };
-use bevy_ahoy::{CharacterLook, prelude::*};
+use bevy_ahoy::{CharacterLook, DashState, prelude::*};
 use bevy_enhanced_input::prelude::{Press, *};
 use bevy_third_person_camera::*;
 use bevy_trenchbroom::prelude::*;
@@ -125,6 +125,11 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
         crouch_height: 2.0,
         ..default()
     },
+    Dashing,
+    AirJumping {
+        count: 5,
+        ..default()
+    },
     RigidBody::Kinematic,
     Collider::cylinder(0.7, 1.8),
     CollisionLayers::new(
@@ -216,6 +221,7 @@ impl PlayerInput {
                 ),
                 (
                     Action::<Jump>::new(),
+                    Press::default(),
                     bindings![KeyCode::Space,  GamepadButton::South],
                 ),
                 (
@@ -469,6 +475,7 @@ fn calcucate_animations(
     mut players: Query<(
         &CharacterController,
         &CharacterControllerState,
+        &DashState,
         &Transform,
         &mut PreviousPosition,
         &mut Player,
@@ -476,7 +483,7 @@ fn calcucate_animations(
 ) {
     const IDLE_ANIMATION_THRESHOLD: f32 = 0.1;
 
-    for (ahoy, ahoy_state, pos, mut prev_pos, mut player) in players.iter_mut() {
+    for (ahoy, ahoy_state, dash, pos, mut prev_pos, mut player) in players.iter_mut() {
         let animation = &mut player.animation;
 
         let displacement = pos.translation - prev_pos.0;
@@ -487,7 +494,7 @@ fn calcucate_animations(
         let grounded = ahoy_state.grounded.is_some();
         let moving = horizontal_speed > IDLE_ANIMATION_THRESHOLD;
 
-        if ahoy_state.dash.progress.is_some() {
+        if dash.progress.is_some() {
             animation.request(AnimationState::Dash);
             continue;
         }

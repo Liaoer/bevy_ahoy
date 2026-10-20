@@ -16,8 +16,9 @@ use std::sync::Arc;
 use tracing::{error, warn};
 
 use crate::{
-    CharacterControllerDerivedProps, CharacterControllerOutput, CharacterControllerState,
-    CharacterLook, DashProgress, MantleOutput, MantleState, input::AccumulatedInput, prelude::*,
+    AirJumpState, AirJumping, CharacterControllerDerivedProps, CharacterControllerOutput,
+    CharacterControllerState, CharacterLook, DashProgress, DashState, Dashing, MantleOutput,
+    MantleState, input::AccumulatedInput, prelude::*,
 };
 
 pub struct AhoyKccPlugin {
@@ -115,6 +116,10 @@ struct Ctx {
     cfg: Read<CharacterController>,
     water: Read<WaterState>,
     look: Option<Read<CharacterLook>>,
+    dash_cfg: Option<Read<Dashing>>,
+    dash: Option<Write<DashState>>,
+    air_jump_cfg: Option<Read<AirJumping>>,
+    air_jump: Option<Write<AirJumpState>>,
     colliders: Read<RigidBodyColliders>,
 }
 
@@ -181,7 +186,9 @@ fn run_kcc(
         ctx.state.last_tac.tick(time.delta());
         ctx.state.last_step_up.tick(time.delta());
         ctx.state.last_step_down.tick(time.delta());
-        ctx.state.dash.last.tick(time.delta());
+        if let Some(dash) = ctx.dash.as_mut() {
+            dash.last.tick(time.delta());
+        }
 
         depenetrate_character(&move_and_slide, &mut ctx, &mut transform);
         update_grounded(&move_and_slide, &colliders, &time, &mut ctx, &mut transform);
@@ -240,7 +247,7 @@ fn run_kcc(
                 &mut ctx,
                 &mut transform,
             );
-        } else if ctx.state.dash.progress.is_some() {
+        } else if ctx.dash.as_ref().is_some_and(|d| d.progress.is_some()) {
             handle_dash_movement(
                 wish_velocity,
                 &time,
@@ -318,7 +325,12 @@ fn run_kcc(
         if ctx.state.grounded.is_some() {
             ctx.velocity.y = ctx.state.platform_velocity.y;
             ctx.state.last_ground.reset();
-            ctx.state.dash.air_dashes_used = 0;
+            if let Some(dash) = ctx.dash.as_mut() {
+                dash.air_dashes_used = 0;
+            }
+            if let Some(air_jump) = ctx.air_jump.as_mut() {
+                air_jump.used = 0;
+            }
         }
         // TODO: check_falling();
 
@@ -722,26 +734,27 @@ fn handle_mantle_movement(
 }
 
 fn update_dash_state(wish_velocity: Vec3, ctx: &mut CtxItem) {
+    let (Some(cfg), Some(dash)) = (ctx.dash_cfg, ctx.dash.as_mut()) else {
+        return;
+    };
     if ctx.state.crane_height_left.is_some()
         || ctx.state.mantle.is_some()
         || ctx.water.level > WaterLevel::Feet
     {
-        ctx.state.dash.progress = None;
+        dash.progress = None;
         return;
     }
-    if ctx.state.dash.progress.is_some() {
+    if dash.progress.is_some() {
         return;
     }
     let Some(dash_time) = ctx.input.dashed.clone() else {
         return;
     };
-    if dash_time.elapsed() > ctx.cfg.dash.input_buffer
-        || ctx.state.dash.last.elapsed() < ctx.cfg.dash.cooldown
-    {
+    if dash_time.elapsed() > cfg.input_buffer || dash.last.elapsed() < cfg.cooldown {
         return;
     }
     let grounded = ctx.state.grounded.is_some();
-    if !grounded && ctx.state.dash.air_dashes_used >= ctx.cfg.dash.max_air_dashes {
+    if !grounded && dash.air_dashes_used >= cfg.max_air_dashes {
         return;
     }
     // Without movement input, dash where we're looking
@@ -752,13 +765,13 @@ fn update_dash_state(wish_velocity: Vec3, ctx: &mut CtxItem) {
     };
 
     ctx.input.dashed = None;
-    ctx.state.dash.last.reset();
+    dash.last.reset();
     if !grounded {
-        ctx.state.dash.air_dashes_used += 1;
+        dash.air_dashes_used += 1;
     }
-    ctx.state.dash.progress = Some(DashProgress {
+    dash.progress = Some(DashProgress {
         direction,
-        time_left: ctx.cfg.dash.duration,
+        time_left: cfg.duration,
     });
 }
 
@@ -770,6 +783,9 @@ fn handle_dash_movement(
     ctx: &mut CtxItem,
     transform: &mut Transform,
 ) {
+    let Some(cfg) = ctx.dash_cfg else {
+        return;
+    };
     // Jumping (or tacing) out of a dash cancels it but keeps the momentum
     let jump_buffered = ctx.input.jumped.is_some();
     handle_jump(
@@ -780,21 +796,27 @@ fn handle_dash_movement(
         ctx,
         transform,
     );
+    let Some(dash) = ctx.dash.as_mut() else {
+        return;
+    };
     if jump_buffered && ctx.input.jumped.is_none() {
-        ctx.state.dash.progress = None;
+        dash.progress = None;
         air_move(wish_velocity, time, move_and_slide, ctx, transform);
         return;
     }
 
-    let Some(progress) = ctx.state.dash.progress.as_mut() else {
+    let Some(progress) = dash.progress.as_mut() else {
         return;
     };
     let direction = progress.direction;
     progress.time_left = progress.time_left.saturating_sub(time.delta());
     let finished = progress.time_left.is_zero();
+    if finished {
+        dash.progress = None;
+    }
 
     // Dashes ignore gravity, so air dashes stay level
-    ctx.velocity.0 = direction * ctx.cfg.dash.speed() + ctx.state.platform_velocity;
+    ctx.velocity.0 = direction * cfg.speed() + ctx.state.platform_velocity;
     step_move(time, move_and_slide, ctx, transform);
     ctx.velocity.0 -= ctx.state.platform_velocity;
     if ctx.state.grounded.is_some() {
@@ -802,7 +824,6 @@ fn handle_dash_movement(
     }
 
     if finished {
-        ctx.state.dash.progress = None;
         // Drop back to run speed so air dashes don't turn into free momentum
         let horizontal = ctx.velocity.0.with_y(0.0).clamp_length_max(ctx.cfg.speed);
         ctx.velocity.0 = horizontal.with_y(ctx.velocity.y);
@@ -1563,6 +1584,7 @@ fn handle_jump(
             } else if let Some(ledge_jump_dir) = handle_ledge_jump_dir(ctx) {
                 ledge_jump_dir
             } else {
+                handle_air_jump(ctx);
                 return;
             }
         } else {
@@ -1598,6 +1620,31 @@ fn handle_jump(
     }
 
     // TODO: Trigger jump event
+}
+
+fn handle_air_jump(ctx: &mut CtxItem) {
+    let (Some(cfg), Some(air_jump)) = (ctx.air_jump_cfg, ctx.air_jump.as_mut()) else {
+        return;
+    };
+    if ctx.state.mantle.is_some()
+        || ctx.water.level > WaterLevel::Feet
+        || air_jump.used >= cfg.count
+    {
+        return;
+    }
+    let Some(jump_time) = ctx.input.jumped.clone() else {
+        return;
+    };
+    if jump_time.elapsed() > ctx.cfg.jump_input_buffer {
+        return;
+    }
+    air_jump.used += 1;
+    ctx.input.jumped = None;
+    ctx.input.tac = None;
+
+    // Override the fall instead of adding to it, so late air jumps still gain height
+    let jump_speed = (2.0 * ctx.cfg.gravity * cfg.height).sqrt();
+    ctx.velocity.y = ctx.velocity.y.max(jump_speed);
 }
 
 fn start_gravity(time: &Time, ctx: &mut CtxItem) {

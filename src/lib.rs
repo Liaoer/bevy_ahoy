@@ -16,7 +16,8 @@ pub mod prelude {
     };
 
     pub use crate::{
-        AhoyPlugins, AhoySystems, CharacterController, CharacterControllerState,
+        AhoyPlugins, AhoySystems, AirJumping, CharacterController, CharacterControllerState,
+        Dashing,
         camera::{CharacterControllerCamera, CharacterControllerCameraOf},
         input::{
             Climbdown, Crane, Crouch, Dash, GlobalMovement, Jump, Mantle, Movement, RotateCamera,
@@ -216,7 +217,6 @@ pub struct CharacterController {
     pub max_ledge_grab_distance: f32,
     pub climb_reverse_sin: f32,
     pub climb_sensitivity: f32,
-    pub dash: DashConfig,
 }
 
 impl Default for CharacterController {
@@ -277,15 +277,38 @@ impl Default for CharacterController {
             max_ledge_grab_distance: 0.3,
             climb_reverse_sin: 40.0_f32.to_radians().sin(),
             climb_sensitivity: 2.5,
-            dash: DashConfig::default(),
         }
     }
 }
 
-#[derive(Clone, Reflect, PartialEq, Debug)]
+/// Add alongside [`CharacterController`] to allow jumping in the air.
+#[derive(Component, Clone, Reflect, PartialEq, Debug)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
-pub struct DashConfig {
+#[reflect(Component)]
+#[require(AirJumpState)]
+pub struct AirJumping {
+    /// Jumps allowed before touching the ground again.
+    pub count: u8,
+    pub height: f32,
+}
+
+impl Default for AirJumping {
+    fn default() -> Self {
+        Self {
+            count: 1,
+            height: 1.2,
+        }
+    }
+}
+
+/// Add alongside [`CharacterController`] to allow dashing.
+#[derive(Component, Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[reflect(Component)]
+#[require(DashState)]
+pub struct Dashing {
     /// Distance covered by a dash that isn't blocked or cancelled.
     pub distance: f32,
     pub duration: Duration,
@@ -295,13 +318,13 @@ pub struct DashConfig {
     pub max_air_dashes: u8,
 }
 
-impl DashConfig {
+impl Dashing {
     pub fn speed(&self) -> f32 {
         self.distance / self.duration.as_secs_f32().max(f32::EPSILON)
     }
 }
 
-impl Default for DashConfig {
+impl Default for Dashing {
     fn default() -> Self {
         Self {
             distance: 8.0,
@@ -380,7 +403,6 @@ pub struct CharacterControllerState {
     ///
     /// This is [`None`] if a mantle is not in progress.
     pub mantle: Option<MantleState>,
-    pub dash: DashState,
 }
 
 impl Default for CharacterControllerState {
@@ -398,7 +420,6 @@ impl Default for CharacterControllerState {
             last_step_down: max_stopwatch(),
             crane_height_left: None,
             mantle: None,
-            dash: DashState::default(),
         }
     }
 }
@@ -410,8 +431,18 @@ pub struct MantleState {
     pub height_left: f32,
 }
 
-#[derive(Clone, Reflect, PartialEq, Debug)]
+#[derive(Component, Clone, Reflect, PartialEq, Debug, Default)]
 #[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[reflect(Component)]
+pub struct AirJumpState {
+    pub used: u8,
+}
+
+#[derive(Component, Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[reflect(Component)]
 pub struct DashState {
     /// [`None`] if a dash is not in progress.
     pub progress: Option<DashProgress>,

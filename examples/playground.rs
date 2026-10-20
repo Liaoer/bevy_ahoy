@@ -108,6 +108,8 @@ fn spawn_player(
             CollisionLayers::new(CollisionLayer::Player, LayerMask::ALL),
             PlayerInput,
             CharacterController::default(),
+            Dashing::default(),
+            AirJumping::default(),
             RigidBody::Kinematic,
             Collider::cylinder(0.7, 1.8),
             Mass(90.0),
