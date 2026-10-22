@@ -17,8 +17,9 @@ use tracing::{error, warn};
 
 use crate::{
     AirJumpState, AirJumping, CharacterControllerDerivedProps, CharacterControllerOutput,
-    CharacterControllerState, CharacterLook, DashProgress, DashState, Dashing, MantleOutput,
-    MantleState, WallRunProgress, WallRunState, WallRunning, input::AccumulatedInput, prelude::*,
+    CharacterControllerState, CharacterLook, DashProgress, DashState, Dashing, JumpGravity,
+    MantleOutput, MantleState, WallRunProgress, WallRunState, WallRunning, input::AccumulatedInput,
+    prelude::*,
 };
 
 pub struct AhoyKccPlugin {
@@ -120,12 +121,33 @@ struct Ctx {
     dash: Option<Write<DashState>>,
     air_jump_cfg: Option<Read<AirJumping>>,
     air_jump: Option<Write<AirJumpState>>,
+    jump_gravity: Option<Read<JumpGravity>>,
     wall_run_cfg: Option<Read<WallRunning>>,
     wall_run: Option<Write<WallRunState>>,
     colliders: Read<RigidBodyColliders>,
 }
 
 impl CtxItem<'_, '_> {
+    /// Gravity scaled by [`JumpGravity`] while airborne; wall runs compensate unscaled gravity, so skip them.
+    fn gravity(&self) -> f32 {
+        let wall_running = self.wall_run.as_ref().is_some_and(|w| w.progress.is_some());
+        let Some(cfg) = self
+            .jump_gravity
+            .filter(|_| self.state.grounded.is_none() && !wall_running)
+        else {
+            return self.cfg.gravity;
+        };
+        let vy = self.velocity.y;
+        let scale = if vy.abs() < cfg.apex_threshold {
+            cfg.apex_scale
+        } else if vy > 0.0 {
+            cfg.rise_scale
+        } else {
+            cfg.fall_scale
+        };
+        self.cfg.gravity * scale
+    }
+
     fn collider_global_transform(
         &self,
         physics_transforms: &Query<(&Position, &Rotation)>,
@@ -1788,14 +1810,14 @@ fn handle_air_jump(ctx: &mut CtxItem) {
 }
 
 fn start_gravity(time: &Time, ctx: &mut CtxItem) {
-    ctx.velocity.y += (ctx.state.platform_velocity.y - ctx.cfg.gravity * 0.5) * time.delta_secs();
+    ctx.velocity.y += (ctx.state.platform_velocity.y - ctx.gravity() * 0.5) * time.delta_secs();
     ctx.state.platform_velocity.y = 0.0;
 
     validate_velocity(ctx);
 }
 
 fn finish_gravity(time: &Time, ctx: &mut CtxItem) {
-    ctx.velocity.y -= ctx.cfg.gravity * 0.5 * time.delta_secs();
+    ctx.velocity.y -= ctx.gravity() * 0.5 * time.delta_secs();
     validate_velocity(ctx);
 }
 

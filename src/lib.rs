@@ -17,7 +17,7 @@ pub mod prelude {
 
     pub use crate::{
         AhoyPlugins, AhoySystems, AirJumping, CharacterController, CharacterControllerState,
-        Dashing, WallRunning,
+        Dashing, JumpGravity, WallRunning,
         camera::{CharacterControllerCamera, CharacterControllerCameraOf},
         input::{
             Climbdown, Crane, Crouch, Dash, GlobalMovement, Jump, Mantle, Movement, RotateCamera,
@@ -298,6 +298,31 @@ impl Default for AirJumping {
         Self {
             count: 1,
             height: 1.2,
+        }
+    }
+}
+
+/// Add alongside [`CharacterController`] to scale gravity over the airborne arc, e.g. to hang at the apex.
+/// Scales also change jump height, since jump speed is derived from unscaled gravity.
+#[derive(Component, Clone, Reflect, PartialEq, Debug)]
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialize", reflect(Serialize, Deserialize))]
+#[reflect(Component)]
+pub struct JumpGravity {
+    pub rise_scale: f32,
+    /// Used while vertical speed is within `apex_threshold` of zero.
+    pub apex_scale: f32,
+    pub apex_threshold: f32,
+    pub fall_scale: f32,
+}
+
+impl Default for JumpGravity {
+    fn default() -> Self {
+        Self {
+            rise_scale: 1.0,
+            apex_scale: 0.4,
+            apex_threshold: 3.0,
+            fall_scale: 1.0,
         }
     }
 }
