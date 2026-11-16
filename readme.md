@@ -1,3 +1,5 @@
+> This fork synchronizes official Ahoy v0.3.0 while retaining template movement extensions. See [UPSTREAM.md](UPSTREAM.md) for exact sources and validation boundaries.
+
 # Bevy Ahoy!
 
 [![crates.io](https://img.shields.io/crates/v/bevy_ahoy)](https://crates.io/crates/bevy_ahoy)
@@ -167,6 +169,7 @@ In contrast, here are some deliberate non-goals:
 
 | bevy        | bevy_ahoy              | avian3d    |
 |-------------|------------------------|------------|
+| 0.20 | 0.3 (this fork) | 0.8 |
 | 0.19        | 0.2                    | 0.7        |
 | 0.18        | 0.1                    | 0.6        |
 | 0.18        | 0.0.3                  | 0.6.0-dev  |

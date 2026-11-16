@@ -45,7 +45,7 @@ pub use avian_pickup::{
     prelude::{
         AvianPickupActor as PickupConfig, AvianPickupActorHoldConfig as PickupHoldConfig,
         AvianPickupActorPullConfig as PickupPullConfig,
-        AvianPickupActorThrowConfig as PickupThrowConfig,
+        AvianPickupActorPushConfig as PickupPushConfig,
     },
 };
 
